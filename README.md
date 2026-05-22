@@ -108,9 +108,9 @@ WAL-01 : 로그인 기능 구현
 ### 1. 레포지토리 클론 및 폴더 이동
 
 ```bash
-git clone https://github.com/prgrms-fullcycle-devcourse/webfull_9_10_ClothingFit_BE
+git clone https://github.com/Decode-Clothing-Fit/Clothing-Fit-BE
 
-cd webfull_9_10_ClothingFit_BE
+cd Clothing-Fit-BE
 ```
 
 ### 2. 패키지 설치

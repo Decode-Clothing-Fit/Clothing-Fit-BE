@@ -46,7 +46,7 @@ export const getClosets = async (
       cursor: { id: params.cursor },
       skip: 1,
     }),
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     select: {
       id: true,
       title: true,
@@ -78,7 +78,7 @@ export const getClosetDetail = async (
     select: {
       userId: true,
       closetItems: {
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         select: {
           id: true,
           closetArchiveId: true,

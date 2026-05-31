@@ -32,3 +32,6 @@ coverage/
 
 # Claude Code
 .claude/
+
+# 크롤링 테스트
+crawl-test/

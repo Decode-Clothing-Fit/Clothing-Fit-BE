@@ -5,6 +5,7 @@ import { registry } from './registry';
 
 import '@/modules/health/health.swagger';
 import '@/modules/characters/character.swagger';
+import '@/modules/follows/follows.swagger';
 
 const generateOpenApiDocument = (): OpenAPIObject => {
   const generator = new OpenApiGeneratorV3(registry.definitions);

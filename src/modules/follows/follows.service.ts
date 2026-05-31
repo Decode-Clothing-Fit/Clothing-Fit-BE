@@ -9,6 +9,7 @@ import prisma from '@/lib/prisma/extensions';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { StatusCodes } from 'http-status-codes';
+import { UserWithProfile } from './follows.types';
 
 async function ensureUserExists(userId: string): Promise<void> {
   const user = await prisma.user.findFirst({

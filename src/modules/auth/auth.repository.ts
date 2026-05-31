@@ -26,3 +26,7 @@ export const saveRefreshToken = async (data: {
 export const deleteRefreshToken = async (token: string) => {
   return basePrisma.refreshToken.deleteMany({ where: { token } });
 };
+
+export const findRefreshToken = async (token: string) => {
+  return basePrisma.refreshToken.findUnique({ where: { token } });
+};

@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '@/common/utils/async.handler';
-import { kakaoLogin } from './auth.service';
+import { kakaoLogin,logout } from './auth.service';
 
 export const kakaoLoginController = asyncHandler(async (req: Request, res: Response) => {
     const { accessToken } = req.body;
@@ -13,3 +13,13 @@ export const kakaoLoginController = asyncHandler(async (req: Request, res: Respo
         data: result,
     })
 })
+
+export const logoutController = asyncHandler(async (req: Request, res: Response) => {
+  const { refreshToken } = req.body;
+
+  await logout(refreshToken);
+
+  res.status(StatusCodes.OK).json({
+    message: '로그아웃 성공',
+  });
+});

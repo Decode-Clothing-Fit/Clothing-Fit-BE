@@ -62,3 +62,19 @@ export const logout = async (refreshToken: string): Promise<void> => {
 
   await deleteRefreshToken(refreshToken);
 };
+
+export const refresh = async (refreshToken: string): Promise<{ accessToken: string }> => {
+  const token = await findRefreshToken(refreshToken);
+
+  if (!token) {
+    throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', 401);
+  }
+
+  if (token.expiresAt < new Date()) {
+    throw new AppError(ErrorCode.TOKEN_EXPIRED, '리프레시 토큰이 만료되었습니다.', 401);
+  }
+
+  const newAccessToken = signAccessToken({ userId: token.userId });
+
+  return { accessToken: newAccessToken };
+};

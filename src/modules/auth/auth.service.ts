@@ -2,7 +2,9 @@ import { Provider } from '@prisma/client';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { signAccessToken, signRefreshToken } from '@/common/utils/jwt';
-import { findUserByProviderId, createSocialUser, saveRefreshToken, findRefreshToken, deleteRefreshToken } from './auth.repository';
+import { findUserByProviderId, createSocialUser, saveRefreshToken,
+   findRefreshToken, deleteRefreshToken, restoreSocialUser, 
+   findUserByProviderIdIncludeDeleted} from './auth.repository';
 import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.types';
 import { OAuth2Client } from 'google-auth-library';
 import { env } from '@/config/env';
@@ -28,7 +30,7 @@ export const kakaoLogin = async (accessToken: string): Promise<SocialLoginResult
   const providerId = String(kakaoUser.id);
   const name = kakaoUser.kakao_account?.profile?.nickname ?? `user_${providerId}`;
 
-  let user = await findUserByProviderId(Provider.KAKAO, providerId);
+  let user = await findUserByProviderIdIncludeDeleted(Provider.KAKAO, providerId);
   let isNewUser = false;
 
   if (!user) {
@@ -37,6 +39,9 @@ export const kakaoLogin = async (accessToken: string): Promise<SocialLoginResult
       providerId,
       name,
     });
+    isNewUser = true;
+  } else if (user.deletedAt) {
+    user = await restoreSocialUser(user.id);
     isNewUser = true;
   }
 
@@ -111,7 +116,7 @@ Promise<SocialLoginResult> => {
   const providerId = googleUser.sub;
   const name = googleUser.name;
 
-  let user = await findUserByProviderId(Provider.GOOGLE, providerId);
+  let user = await findUserByProviderIdIncludeDeleted(Provider.GOOGLE, providerId);
   let isNewUser = false;
 
   if(!user) {
@@ -120,6 +125,9 @@ Promise<SocialLoginResult> => {
       providerId,
       name
     })
+    isNewUser = true;
+  } else if (user.deletedAt) {
+    user = await restoreSocialUser(user.id);
     isNewUser = true;
   }
 

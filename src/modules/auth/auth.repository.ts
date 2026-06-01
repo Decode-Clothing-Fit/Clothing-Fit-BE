@@ -30,3 +30,18 @@ export const deleteRefreshToken = async (token: string) => {
 export const findRefreshToken = async (token: string) => {
   return basePrisma.refreshToken.findUnique({ where: { token } });
 };
+
+// 이거 함수명이 너무 긴 것 같아서 괜찮은지 모르겠습니다.
+export const findUserByProviderIdIncludeDeleted = async (provider:
+  Provider, providerId: string) => {
+    return basePrisma.user.findFirst({
+      where: { provider, providerId }
+    })
+  }
+
+  export const restoreSocialUser = async (id: string) => {
+    return basePrisma.user.update({
+      where: { id },
+      data: { deletedAt: null}
+    })
+  }

@@ -14,3 +14,10 @@ export interface SocialLoginResult {
     refreshToken: string;
     isNewUser: boolean;
 }
+
+export interface GoogleUserInfo {
+    sub: string;
+    name: string;
+    email?: string;
+    picture?: string;
+}

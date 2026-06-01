@@ -3,7 +3,9 @@ import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { signAccessToken, signRefreshToken } from '@/common/utils/jwt';
 import { findUserByProviderId, createSocialUser, saveRefreshToken, findRefreshToken, deleteRefreshToken } from './auth.repository';
-import type { KakaoUserInfo, SocialLoginResult } from './auth.types';
+import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.types';
+import { OAuth2Client } from 'google-auth-library';
+import { env } from '@/config/env';
 
 const getKakaoUserInfo = async (accessToken: string): Promise<KakaoUserInfo> => {
   const res = await fetch('https://kapi.kakao.com/v2/user/me', {
@@ -78,3 +80,62 @@ export const refresh = async (refreshToken: string): Promise<{ accessToken: stri
 
   return { accessToken: newAccessToken };
 };
+
+const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
+
+const getGoogleUserInfo = async (idToken: string):
+Promise<GoogleUserInfo> => {
+  const ticket = await googleClient.verifyIdToken({
+    idToken,
+    audience: env.GOOGLE_CLIENT_ID
+  })
+
+  const payload = ticket.getPayload();
+
+  if (!payload) {
+    throw new AppError(ErrorCode.UNAUTHORIZED, '유효하지 않은 구글 토큰입니다.', 401);
+  }
+
+  return {
+    sub: payload.sub,
+    name: payload.name ?? `user_${payload.sub}`,
+    email: payload.email,
+    picture: payload.picture
+  }
+}
+
+export const googleLogin = async (idToken: string):
+Promise<SocialLoginResult> => {
+  const googleUser = await getGoogleUserInfo(idToken);
+
+  const providerId = googleUser.sub;
+  const name = googleUser.name;
+
+  let user = await findUserByProviderId(Provider.GOOGLE, providerId);
+  let isNewUser = false;
+
+  if(!user) {
+    user = await createSocialUser({
+      provider: Provider.GOOGLE,
+      providerId,
+      name
+    })
+    isNewUser = true;
+  }
+
+  const newAccessToken = signAccessToken({ userId: user.id });
+  const newRefreshToken = signRefreshToken({ userId: user.id });
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+
+  await saveRefreshToken({
+    token: newRefreshToken,
+    userId: user.id,
+    expiresAt
+  });
+
+  return { accessToken: newAccessToken, refreshToken:
+    newRefreshToken, isNewUser
+  }
+}

@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '@/common/utils/async.handler';
 import { parsePaginationParams } from '@/common/utils/pagination';
+import { getClosets } from './closet.service';
 import { getClosetDetail, getClosets } from './closet.service';
 import type { ClosetItemDetail } from './closet.service';
 import type { ApiResponse } from '@/common/types/api';

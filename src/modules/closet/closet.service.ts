@@ -46,6 +46,7 @@ export const getClosets = async (
       cursor: { id: params.cursor },
       skip: 1,
     }),
+    orderBy: { createdAt: 'desc' },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     select: {
       id: true,

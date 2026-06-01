@@ -111,3 +111,31 @@ registry.registerPath({
     },
   },
 });
+
+registry.registerPath({
+  method: 'post',
+  path: '/auth/google',
+  tags: ['Auth'],
+  summary: '구글 소셜 로그인',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            idToken: z.string().openapi({ example: '구글_ID_토큰' }),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: '로그인 성공',
+      content: { 'application/json': { schema: KakaoLoginResponseSchema } },
+    },
+    401: {
+      description: '유효하지 않은 구글 토큰',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});

@@ -5,6 +5,7 @@ import characterRouter from '../modules/characters/character.route';
 import followsRouter from '@/modules/follows/follows.route';
 import authRouter from '../modules/auth/auth.route';
 import closetRouter from '../modules/closet/closet.route';
+import homeRouter from '@/modules/home/home.route';
 
 export const router: RouterType = Router();
 
@@ -14,3 +15,4 @@ router.use('/characters', characterRouter);
 router.use('/users', followsRouter);
 router.use('/auth', authRouter);
 router.use('/closet', closetRouter);
+router.use('/home', homeRouter);

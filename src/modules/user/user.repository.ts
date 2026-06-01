@@ -18,3 +18,19 @@ export const deleteAllRefreshToken = async (userId: string) => {
         where: { userId }
     })
 }
+
+export const findUserProfileById = async (id: string) => {
+    return basePrisma.user.findFirst({
+        where: { id, deletedAt: null},
+        include: {
+            profile: true,
+            _count: {
+                select: {
+                    posts: true,
+                    followers: true,
+                    following: true
+                },
+            },
+        },
+    })
+}

@@ -1,6 +1,9 @@
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
-import { findUserById, softDeleteUser, deleteAllRefreshToken, findUserProfileById } from './user.repository';
+import { findUserById, softDeleteUser, deleteAllRefreshToken, 
+    findUserProfileById, findPostsByUserId } from './user.repository';
+import { buildPaginationResult } from '@/common/utils/pagination';
+import type { GetUserPostsQuery } from './user.schema';
 
 export const deleteUser = async (userId: string):
 Promise<void> => {
@@ -29,3 +32,29 @@ export const getUserProfile = async (userId: string) => {
         followingCount: user._count.following
     }
 }
+
+export const getUserPosts = async (
+  targetUserId: string,
+  requesterId: string,
+  query: GetUserPostsQuery,
+) => {
+  const user = await findUserById(targetUserId);
+
+  if (!user) {
+    throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', 404);
+  }
+
+  const posts = await findPostsByUserId(targetUserId, requesterId, query.cursor, query.limit);
+
+  const items = posts.map((post) => ({
+    id: post.id,
+    nickname: post.user.profile?.nickname ?? null,
+    imageUrl: post.closetArchive.imageUrl,
+    likeCount: post._count.postLikes,
+    isLiked: post.postLikes.length > 0,
+    bookmarkCount: post._count.postBookmarks,
+    isBookmarked: post.postBookmarks.length > 0,
+  }));
+
+  return buildPaginationResult(items, query.limit);
+};

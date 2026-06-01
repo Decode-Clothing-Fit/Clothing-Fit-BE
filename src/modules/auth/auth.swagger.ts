@@ -1,0 +1,113 @@
+import { registry } from '@/config/registry';
+import { z } from 'zod';
+import { ErrorResponseSchema } from '@/common/schemas/api.schema';
+
+const KakaoLoginResponseSchema = z
+  .object({
+    message: z.string().openapi({ example: '카카오 로그인 성공' }),
+    data: z.object({
+      accessToken: z.string().openapi({ example: 'eyJhbGci...' }),
+      refreshToken: z.string().openapi({ example: 'eyJhbGci...' }),
+      isNewUser: z.boolean().openapi({ example: true }),
+    }),
+  })
+  .openapi('KakaoLoginResponse');
+
+const RefreshResponseSchema = z
+  .object({
+    message: z.string().openapi({ example: '토큰 재발급 성공' }),
+    data: z.object({
+      accessToken: z.string().openapi({ example: 'eyJhbGci...' }),
+    }),
+  })
+  .openapi('RefreshResponse');
+
+registry.registerPath({
+  method: 'post',
+  path: '/auth/kakao',
+  tags: ['Auth'],
+  summary: '카카오 소셜 로그인',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            accessToken: z.string().openapi({ example: '카카오_액세스_토큰' }),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: '로그인 성공',
+      content: { 'application/json': { schema: KakaoLoginResponseSchema } },
+    },
+    401: {
+      description: '유효하지 않은 카카오 토큰',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/auth/logout',
+  tags: ['Auth'],
+  summary: '로그아웃',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            refreshToken: z.string().openapi({ example: '리프레시_토큰' }),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: '로그아웃 성공',
+      content: {
+        'application/json': {
+          schema: z.object({
+            message: z.string().openapi({ example: '로그아웃 성공' }),
+          }),
+        },
+      },
+    },
+    401: {
+      description: '유효하지 않은 토큰',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/auth/refresh',
+  tags: ['Auth'],
+  summary: '액세스 토큰 재발급',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            refreshToken: z.string().openapi({ example: '리프레시_토큰' }),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: '토큰 재발급 성공',
+      content: { 'application/json': { schema: RefreshResponseSchema } },
+    },
+    401: {
+      description: '유효하지 않은 토큰',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});

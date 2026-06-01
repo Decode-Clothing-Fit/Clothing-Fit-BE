@@ -6,6 +6,7 @@ import { registry } from './registry';
 import '@/modules/health/health.swagger';
 import '@/modules/posts/posts.swagger';
 import '@/modules/characters/character.swagger';
+import '@/modules/auth/auth.swagger';
 import '@/modules/closet/closet.swagger';
 
 const generateOpenApiDocument = (): OpenAPIObject => {

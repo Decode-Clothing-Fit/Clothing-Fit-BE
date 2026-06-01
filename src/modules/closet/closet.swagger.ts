@@ -1,6 +1,5 @@
 import { registry } from '@/config/registry';
 import { ErrorResponseSchema } from '@/common/schemas/api.schema';
-import { ClosetListResponseSchema, ClosetQuerySchema } from './closet.schema';
 import { ClosetDetailResponseSchema, ClosetListResponseSchema, ClosetParamsSchema, ClosetQuerySchema } from './closet.schema';
 
 registry.registerPath({

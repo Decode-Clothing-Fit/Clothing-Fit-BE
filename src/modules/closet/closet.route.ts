@@ -1,8 +1,6 @@
 import { type Router as RouterType, Router } from 'express';
 import { authenticate } from '@/common/middleware/auth.middleware';
 import { validate } from '@/common/middleware/validate.middleware';
-import { getClosetsController } from './closet.controller';
-import { ClosetQuerySchema } from './closet.schema';
 import { getClosetDetailController, getClosetsController } from './closet.controller';
 import { ClosetParamsSchema, ClosetQuerySchema } from './closet.schema';
 

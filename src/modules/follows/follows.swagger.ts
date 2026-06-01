@@ -5,6 +5,7 @@ import {
   FollowListResponseSchema,
   FollowToggleResponseSchema,
 } from './follows.schema';
+import { ErrorResponseSchema } from '@/common/schemas/api.schema';
 
 export const followsRegistry = registry;
 
@@ -19,12 +20,36 @@ followsRegistry.registerPath({
     params: FollowParamsSchema,
     query: FollowsPaginationQuerySchema,
   },
-  responses: {
+responses: {
     200: {
       description: '팔로워 목록',
       content: {
         'application/json': {
           schema: FollowListResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: '잘못된 요청 (요청 파라미터 유효성 검사 실패)',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: '인증 실패 (토큰 누락 또는 만료)',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: '사용자를 찾을 수 없음',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
         },
       },
     },
@@ -51,6 +76,30 @@ followsRegistry.registerPath({
         },
       },
     },
+    400: {
+      description: '잘못된 요청 (요청 파라미터 유효성 검사 실패)',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: '인증 실패 (토큰 누락 또는 만료)',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: '사용자를 찾을 수 없음',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
   },
 });
 
@@ -73,6 +122,22 @@ followsRegistry.registerPath({
         },
       },
     },
+    400: {
+      description: '잘못된 요청 (요청 파라미터 유효성 검사 실패) 또는 자기 자신 팔로우',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: '인증 실패 (토큰 누락 또는 만료)',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
   },
 });
 
@@ -92,6 +157,22 @@ followsRegistry.registerPath({
       content: {
         'application/json': {
           schema: FollowToggleResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: '잘못된 요청 (요청 파라미터 유효성 검사 실패)',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: '인증 실패 (토큰 누락 또는 만료)',
+      content: {
+        'application/json': {
+          schema: ErrorResponseSchema,
         },
       },
     },

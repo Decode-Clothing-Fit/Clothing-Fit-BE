@@ -3,13 +3,12 @@ import { followUser, getFollowers, getFollowings, unfollowUser } from './follows
 import { validate } from '@/common/middleware/validate.middleware';
 import { FollowParamsSchema, FollowsPaginationQuerySchema } from './follows.schema';
 import { authenticate } from '@/common/middleware/auth.middleware';
-import { asyncHandler } from '@/common/utils/async.handler';
 
 const router: RouterType = Router();
 
-router.get('/:id/followers', validate({ params: FollowParamsSchema, query: FollowsPaginationQuerySchema }), authenticate, asyncHandler(getFollowers));
-router.get('/:id/followings', validate({ params: FollowParamsSchema, query: FollowsPaginationQuerySchema }), authenticate, asyncHandler(getFollowings));
-router.post('/:id/follow', validate({ params: FollowParamsSchema }), authenticate, asyncHandler(followUser));
-router.delete('/:id/follow', validate({ params: FollowParamsSchema }), authenticate, asyncHandler(unfollowUser));
+router.get('/:id/followers', authenticate, validate({ params: FollowParamsSchema, query: FollowsPaginationQuerySchema }), getFollowers);
+router.get('/:id/followings', authenticate, validate({ params: FollowParamsSchema, query: FollowsPaginationQuerySchema }), getFollowings);
+router.post('/:id/follow', authenticate, validate({ params: FollowParamsSchema }), followUser);
+router.delete('/:id/follow', authenticate, validate({ params: FollowParamsSchema }), unfollowUser);
 
 export default router;

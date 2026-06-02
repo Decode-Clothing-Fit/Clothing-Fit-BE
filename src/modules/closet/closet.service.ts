@@ -35,6 +35,15 @@ export type ClosetItemDetail = {
   createdAt: Date;
 };
 
+export type ClosetDetail = {
+  id: string;
+  title: string;
+  imageUrl: string;
+  modelUrl: string | null;
+  isPublished: boolean;
+  closetItems: ClosetItemDetail[];
+};
+
 export const getClosets = async (
   userId: string,
   params: CursorPaginationParams,
@@ -72,11 +81,16 @@ export const getClosets = async (
 export const getClosetDetail = async (
   userId: string,
   closetArchiveId: string,
-): Promise<ClosetItemDetail[]> => {
+): Promise<ClosetDetail> => {
   const archive = await prisma.closetArchive.findUnique({
     where: { id: closetArchiveId },
     select: {
+      id: true,
       userId: true,
+      title: true,
+      imageUrl: true,
+      modelUrl: true,
+      post: { select: { id: true } },
       closetItems: {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         select: {
@@ -102,5 +116,12 @@ export const getClosetDetail = async (
     throw new AppError(ErrorCode.NOT_CLOSET_OWNER, '접근 권한이 없습니다.', 403);
   }
 
-  return archive.closetItems;
+  return {
+    id: archive.id,
+    title: archive.title,
+    imageUrl: archive.imageUrl,
+    modelUrl: archive.modelUrl,
+    isPublished: archive.post !== null,
+    closetItems: archive.closetItems,
+  };
 };

@@ -41,7 +41,7 @@ registry.registerPath({
   path: '/closet/{id}',
   tags: ['Closet'],
   summary: '옷장 상세 조회',
-  description: '특정 옷장 아카이브에 포함된 아이템 목록을 반환합니다.',
+  description: '특정 옷장 아카이브의 정보(2D 이미지, 3D 모델, 게시 여부)와 포함된 아이템 목록을 반환합니다.',
   security: [{ bearerAuth: [] }],
   request: {
     params: ClosetParamsSchema,

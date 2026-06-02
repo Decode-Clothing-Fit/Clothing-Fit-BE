@@ -8,6 +8,7 @@ import closetRouter from '../modules/closet/closet.route';
 import fittingRouter from '@/modules/fitting/fitting.route';
 import homeRouter from '@/modules/home/home.route';
 import userRouter from '../modules/user/user.route';
+import profileRouter from '../modules/profile/profile.route';
 
 export const router: RouterType = Router();
 
@@ -21,3 +22,5 @@ router.use('/closet', closetRouter);
 router.use('/fitting', fittingRouter);
 
 router.use('/home', homeRouter);
+router.use('/profile', profileRouter);
+

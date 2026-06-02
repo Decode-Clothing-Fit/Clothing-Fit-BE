@@ -12,6 +12,7 @@ import '@/modules/closet/closet.swagger';
 import '@/modules/fitting/fitting.swagger';
 import '@/modules/home/home.swagger';
 import '@/modules/user/user.swagger';
+import '@/modules/profile/profile.swagger';
 
 const generateOpenApiDocument = (): OpenAPIObject => {
   const generator = new OpenApiGeneratorV3(registry.definitions);

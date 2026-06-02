@@ -82,7 +82,24 @@ export const getBodyInfo = async (userId: string) => {
 export const updateBodyInfo = async (userId: string, body: UpdateBodyInfoBody): Promise<void> => {
   const { height, weight, chest, waist, hip, shoulder } = body;
 
-  const measurements = { chest, waist, hip, shoulder };
+  const existing = await prisma.bodyInfo.findUnique({
+    where: { userId }
+  })
+
+  const prevMeasurements = existing?.measurements as {
+    chest?: number;
+    waist?: number;
+    hip?: number;
+    shoulder?: number;
+  } | null;
+
+  const measurements = {
+    chest: chest ?? prevMeasurements?.chest,
+    waist: waist ?? prevMeasurements?.waist, 
+    hip: hip ?? prevMeasurements?. hip, 
+    shoulder: shoulder ?? prevMeasurements?.shoulder
+  };
+
   await prisma.bodyInfo.upsert({
     where: { userId },
     update: { height, weight, measurements },

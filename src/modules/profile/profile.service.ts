@@ -14,7 +14,7 @@ export const getProfile = async (userId: string) => {
   }
 
   return {
-    nickname: user.profile?.nickname ?? null,
+    nickname: user.profile?.nickname ?? user.name,
     imageUrl: user.profile?.imageUrl ?? null,
     gender: user.profile?.gender ?? null,
   };

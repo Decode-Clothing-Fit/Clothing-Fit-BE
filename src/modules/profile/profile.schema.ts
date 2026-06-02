@@ -33,10 +33,10 @@ export const bodyInfoResponseSchema = z.object({
 export const updateBodyInfoSchema = z.object({
     height: z.number().int().min(1).max(300),
     weight: z.number().int().min(1).max(500),
-    chest: z.number().optional(),
-    waist: z.number().optional(),
-    hip: z.number().optional(),
-    shoulder: z.number().optional(),
+    chest: z.number().int().min(1).max(300).optional(),
+    waist: z.number().int().min(1).max(300).optional(),
+    hip: z.number().int().min(1).max(300).optional(),
+    shoulder: z.number().int().min(1).max(300).optional(),
 })
 
 export type UpdateBodyInfoBody = z.infer<typeof updateBodyInfoSchema>;

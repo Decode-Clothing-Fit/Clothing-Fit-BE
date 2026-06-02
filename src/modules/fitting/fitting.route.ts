@@ -1,31 +1,12 @@
 import { type Router as RouterType, Router } from 'express';
-import multer from 'multer';
 import { authenticate } from '@/common/middleware/auth.middleware';
-import { generate2DFittingController } from './fitting.controller';
+import { validate } from '@/common/middleware/validate.middleware';
+import { start3DFittingController, get3DFittingStatusController } from './fitting.controller';
+import { Fitting3DRequestSchema, SessionIdParamSchema } from './fitting.schema';
 
 const router: RouterType = Router();
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('이미지 파일만 업로드 가능합니다.'));
-    }
-  },
-});
-
-router.post(
-  '/2d',
-  authenticate,
-  upload.fields([
-    { name: 'topImage', maxCount: 1 },
-    { name: 'bottomImage', maxCount: 1 },
-    { name: 'footwearImage', maxCount: 1 },
-  ]),
-  generate2DFittingController,
-);
+router.post('/3d', authenticate, validate({ body: Fitting3DRequestSchema }), start3DFittingController);
+router.get('/:sessionId', authenticate, validate({ params: SessionIdParamSchema }), get3DFittingStatusController);
 
 export default router;

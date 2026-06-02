@@ -1,34 +1,35 @@
 import type { Request, Response } from 'express';
-import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '@/common/utils/async.handler';
-import { AppError } from '@/common/errors/app-error';
-import { ErrorCode } from '@/common/errors/error-code';
-import { generate2DFitting } from './fitting.service';
-import { Fitting2DBodySchema } from './fitting.schema';
+import { start3DFitting, get3DFittingStatus } from './fitting.service';
+import {StatusCodes} from "http-status-codes";
 
-export const generate2DFittingController = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user!.id;
-  const files = req.files as Record<string, Express.Multer.File[]>;
-  const fittingImages = {
-    topImage: files?.topImage?.[0],
-    bottomImage: files?.bottomImage?.[0],
-    footwearImage: files?.footwearImage?.[0],
-  };
+export const start3DFittingController = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { closetArchiveId } = req.body;
 
-  let clothingParsed: unknown;
-  if (req.body.clothing) {
-    try {
-      clothingParsed = JSON.parse(req.body.clothing);
-    } catch {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, 'clothing 형식이 올바르지 않습니다.', 400);
-    }
-  }
+    const sessionId = await start3DFitting(userId, closetArchiveId);
 
-  const fittingBody = Fitting2DBodySchema.parse({
-    clothing: clothingParsed,
-  });
+    res.status(StatusCodes.ACCEPTED).json({
+        message: '3D 피팅 생성 시작',
+        data: { sessionId },
+    });
+});
 
-  const result = await generate2DFitting(userId, fittingImages, fittingBody);
+const STATUS_MESSAGES: Record<string, string> = {
+    QUEUED: '3D 피팅 대기 중',
+    PROCESSING: '3D 피팅 생성 중',
+    SUCCEEDED: '3D 피팅 생성 완료',
+    FAILED: '3D 피팅 생성 실패',
+};
 
-  res.status(StatusCodes.OK).json({ data: result });
+export const get3DFittingStatusController = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { sessionId } = req.params;
+
+    const result = await get3DFittingStatus(userId, sessionId);
+
+    res.status(StatusCodes.OK).json({
+        message: STATUS_MESSAGES[result.status] ?? '3D 피팅 상태 조회',
+        data: result,
+    });
 });

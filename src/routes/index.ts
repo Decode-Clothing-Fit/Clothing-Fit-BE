@@ -5,7 +5,7 @@ import characterRouter from '../modules/characters/character.route';
 import followsRouter from '@/modules/follows/follows.route';
 import authRouter from '../modules/auth/auth.route';
 import closetRouter from '../modules/closet/closet.route';
-import fittingRouter from '../modules/fitting/fitting.route';
+import fittingRouter from '@/modules/fitting/fitting.route';
 import homeRouter from '@/modules/home/home.route';
 import userRouter from '../modules/user/user.route';
 

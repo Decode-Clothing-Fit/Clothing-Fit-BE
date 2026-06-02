@@ -3,74 +3,35 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 
 extendZodWithOpenApi(z);
 
-export const ClothingMeasurementsSchema = z
-  .object({
-    top: z
-      .object({
-        name: z.string().optional().openapi({ description: '상의 이름' }),
-        size: z.string().optional().openapi({ description: '상의 사이즈' }),
-        chestWidth: z.number().optional().openapi({ description: '상의 가슴 너비 (cm)' }),
-        totalLength: z.number().optional().openapi({ description: '상의 총 길이 (cm)' }),
-        shoulder: z.number().optional().openapi({ description: '상의 어깨 너비 (cm)' }),
-        waist: z.number().optional().openapi({ description: '상의 허리 둘레 (cm)' }),
-      })
-      .optional()
-      .openapi({ description: '상의 치수 정보' }),
-    bottom: z
-      .object({
-        name: z.string().optional().openapi({ description: '하의 이름' }),
-        size: z.string().optional().openapi({ description: '하의 사이즈' }),
-        waist: z.number().optional().openapi({ description: '하의 허리 둘레 (cm)' }),
-        hips: z.number().optional().openapi({ description: '하의 엉덩이 둘레 (cm)' }),
-        thigh: z.number().optional().openapi({ description: '하의 허벅지 둘레 (cm)' }),
-        totalLength: z.number().optional().openapi({ description: '하의 총 길이 (cm)' }),
-      })
-      .optional()
-      .openapi({ description: '하의 치수 정보' }),
-  })
-  .openapi('ClothingMeasurements');
+export const Fitting3DRequestSchema = z
+    .object({
+        closetArchiveId: z.string().uuid().openapi({ description: '2D 피팅 이미지가 저장된 옷장 아카이브 ID', example: '01968b1c-...' }),
+    })
+    .openapi('Fitting3DRequest');
 
-export type ClothingMeasurements = z.infer<typeof ClothingMeasurementsSchema>;
+export const Fitting3DStartResponseSchema = z
+    .object({
+        message: z.string().openapi({ example: '3D 피팅 생성 시작' }),
+        data: z.object({
+            sessionId: z.string().openapi({ description: '상태 조회에 사용할 세션 ID (24시간 유효)', example: '01968b1c-...' }),
+        }),
+    })
+    .openapi('Fitting3DStartResponse');
 
-export const Fitting2DBodySchema = z
-  .object({
-    clothing: ClothingMeasurementsSchema.optional().openapi({ description: '의류 치수 정보' }),
-  })
-  .openapi('Fitting2DBody');
+export const Fitting3DStatusResponseSchema = z
+    .object({
+        message: z.string().openapi({ example: '3D 피팅 생성 완료' }),
+        data: z.object({
+            status: z.enum(['QUEUED', 'PROCESSING', 'SUCCEEDED', 'FAILED']).openapi({ example: 'SUCCEEDED' }),
+            progress: z.number().optional().openapi({ example: 80 }),
+            glbUrl: z.string().url().nullable().openapi({ example: 'https://assets.meshy.ai/...glb' }),
+            thumbnailUrl: z.string().url().nullable().openapi({ example: 'https://assets.meshy.ai/...png' }),
+        }),
+    })
+    .openapi('Fitting3DStatusResponse');
 
-export type Fitting2DBody = z.infer<typeof Fitting2DBodySchema>;
-
-export const Fitting2DRequestSchema = z
-  .object({
-    topImage: z.instanceof(File).optional().openapi({
-      type: 'string',
-      format: 'binary',
-      description: '상의 이미지 (없으면 흰 티셔츠로 대체)',
-    }),
-    bottomImage: z.instanceof(File).optional().openapi({
-      type: 'string',
-      format: 'binary',
-      description: '하의 이미지',
-    }),
-    footwearImage: z.instanceof(File).optional().openapi({
-      type: 'string',
-      format: 'binary',
-      description: '신발 이미지',
-    }),
-    clothing: z.string().optional().openapi({
-      description: '의류 치수 정보 (JSON string)',
-      example: JSON.stringify({
-        top: { name: '오버핏 셔츠', size: 'L', chestWidth: 58, totalLength: 72, shoulder: 48 },
-        bottom: { name: '슬랙스', size: 'M', waist: 76, hips: 98, thigh: 56, totalLength: 105 },
-      }),
-    }),
-  })
-  .openapi('Fitting2DRequest');
-
-export const Fitting2DResponseSchema = z
-  .object({
-    data: z.object({
-      imageUrl: z.string().openapi({ description: '생성된 2D 피팅 이미지 (base64 data URL)' }),
-    }),
-  })
-  .openapi('Fitting2DResponse');
+export const SessionIdParamSchema = z
+    .object({
+        sessionId: z.string().openapi({ example: '01968b1c-...' }),
+    })
+    .openapi('SessionIdParam');

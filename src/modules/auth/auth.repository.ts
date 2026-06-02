@@ -25,20 +25,19 @@ export const findRefreshToken = async (token: string) => {
   return prisma.refreshToken.findUnique({ where: { token } });
 };
 
-export const findUserByProviderIdIncludeDeleted = async (provider:
-  Provider, providerId: string) => {
-    return prisma.user.findFirst({
-      where: { provider, providerId }
-    })
-  }
+export const findUserByProviderIdIncludeDeleted = async (provider: Provider, providerId: string) => {
+  return prisma.user.findFirst({
+    where: { provider, providerId },
+  });
+};
 
-  export const restoreSocialUser = async (id: string, name: string) => {
-    return prisma.user.update({
-      where: { id },
-      data: { deletedAt: null, name }
-    })
-  }
+export const restoreSocialUser = async (id: string, name: string) => {
+  return prisma.user.update({
+    where: { id },
+    data: { deletedAt: null, name },
+  });
+};
 
-  export const deleteRefreshTokenByUserId = async (userId: string) => {
-    return prisma.refreshToken.deleteMany({ where: {userId}})
-  }
+export const deleteRefreshTokenByUserId = async (userId: string) => {
+  return prisma.refreshToken.deleteMany({ where: { userId } });
+};

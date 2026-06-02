@@ -6,12 +6,10 @@ import { googleLoginSchema, kakaoLoginSchema, refreshTokenSchema } from './auth.
 const router: RouterType = Router();
 
 // 카카오 소셜 로그인
-router.post('/kakao', validate({body: kakaoLoginSchema}),
-kakaoLoginController);
+router.post('/kakao', validate({ body: kakaoLoginSchema }), kakaoLoginController);
 
 // 구글 소셜 로그인
-router.post('/google', validate({ body: googleLoginSchema }),
-googleLoginController);
+router.post('/google', validate({ body: googleLoginSchema }), googleLoginController);
 
 // 로그아웃
 router.delete('/logout', validate({ body: refreshTokenSchema }), logoutController);

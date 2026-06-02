@@ -38,3 +38,7 @@ export const findUserByProviderIdIncludeDeleted = async (provider:
       data: { deletedAt: null, name }
     })
   }
+
+  export const deleteRefreshTokenByUserId = async (userId: string) => {
+    return prisma.refreshToken.deleteMany({ where: {userId}})
+  }

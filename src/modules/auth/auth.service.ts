@@ -4,7 +4,7 @@ import { ErrorCode } from '@/common/errors/error-code';
 import { signAccessToken, signRefreshToken } from '@/common/utils/jwt';
 import { createSocialUser, saveRefreshToken,
    findRefreshToken, deleteRefreshToken, restoreSocialUser, 
-   findUserByProviderIdIncludeDeleted} from './auth.repository';
+   findUserByProviderIdIncludeDeleted, deleteRefreshTokenByUserId} from './auth.repository';
 import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.types';
 import { OAuth2Client } from 'google-auth-library';
 import { env } from '@/config/env';
@@ -51,6 +51,7 @@ export const kakaoLogin = async (accessToken: string): Promise<SocialLoginResult
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30);
 
+  await deleteRefreshTokenByUserId(user.id);
   await saveRefreshToken({
     token: newRefreshToken,
     userId: user.id,
@@ -78,6 +79,7 @@ export const refresh = async (refreshToken: string): Promise<{ accessToken: stri
   }
 
   if (token.expiresAt < new Date()) {
+    await deleteRefreshToken(refreshToken);
     throw new AppError(ErrorCode.TOKEN_EXPIRED, '리프레시 토큰이 만료되었습니다.', 401);
   }
 
@@ -137,6 +139,7 @@ Promise<SocialLoginResult> => {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30);
 
+  await deleteRefreshTokenByUserId(user.id);
   await saveRefreshToken({
     token: newRefreshToken,
     userId: user.id,

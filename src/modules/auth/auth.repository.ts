@@ -1,18 +1,12 @@
 import type { Provider } from '@prisma/client';
-import { basePrisma } from '@/lib/prisma/client';
-
-export const findUserByProviderId = async (provider: Provider, providerId: string) => {
-  return basePrisma.user.findFirst({
-    where: { provider, providerId, deletedAt: null },
-  });
-};
+import prisma from '@/lib/prisma/extensions';
 
 export const createSocialUser = async (data: {
   provider: Provider;
   providerId: string;
   name: string;
 }) => {
-  return basePrisma.user.create({ data });
+  return prisma.user.create({ data });
 };
 
 export const saveRefreshToken = async (data: {
@@ -20,28 +14,27 @@ export const saveRefreshToken = async (data: {
   userId: string;
   expiresAt: Date;
 }) => {
-  return basePrisma.refreshToken.create({ data });
+  return prisma.refreshToken.create({ data });
 };
 
 export const deleteRefreshToken = async (token: string) => {
-  return basePrisma.refreshToken.deleteMany({ where: { token } });
+  return prisma.refreshToken.deleteMany({ where: { token } });
 };
 
 export const findRefreshToken = async (token: string) => {
-  return basePrisma.refreshToken.findUnique({ where: { token } });
+  return prisma.refreshToken.findUnique({ where: { token } });
 };
 
-// 이거 함수명이 너무 긴 것 같아서 괜찮은지 모르겠습니다.
 export const findUserByProviderIdIncludeDeleted = async (provider:
   Provider, providerId: string) => {
-    return basePrisma.user.findFirst({
+    return prisma.user.findFirst({
       where: { provider, providerId }
     })
   }
 
-  export const restoreSocialUser = async (id: string) => {
-    return basePrisma.user.update({
+  export const restoreSocialUser = async (id: string, name: string) => {
+    return prisma.user.update({
       where: { id },
-      data: { deletedAt: null}
+      data: { deletedAt: null, name }
     })
   }

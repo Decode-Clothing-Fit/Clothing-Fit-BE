@@ -2,7 +2,7 @@ import { Provider } from '@prisma/client';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { signAccessToken, signRefreshToken } from '@/common/utils/jwt';
-import { findUserByProviderId, createSocialUser, saveRefreshToken,
+import { createSocialUser, saveRefreshToken,
    findRefreshToken, deleteRefreshToken, restoreSocialUser, 
    findUserByProviderIdIncludeDeleted} from './auth.repository';
 import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.types';
@@ -41,7 +41,7 @@ export const kakaoLogin = async (accessToken: string): Promise<SocialLoginResult
     });
     isNewUser = true;
   } else if (user.deletedAt) {
-    user = await restoreSocialUser(user.id);
+    user = await restoreSocialUser(user.id, name);
     isNewUser = true;
   }
 
@@ -127,7 +127,7 @@ Promise<SocialLoginResult> => {
     })
     isNewUser = true;
   } else if (user.deletedAt) {
-    user = await restoreSocialUser(user.id);
+    user = await restoreSocialUser(user.id, name);
     isNewUser = true;
   }
 

@@ -28,7 +28,7 @@ export const bodyInfoResponseSchema = z.object({
     waist: z.number().nullable(),
     hip: z.number().nullable(),
     shoulder: z.number().nullable(),
-}).openapi('BodyInfoREsponse');
+}).openapi('BodyInfoResponse');
 
 export const updateBodyInfoSchema = z.object({
     height: z.number().int().min(1).max(300),

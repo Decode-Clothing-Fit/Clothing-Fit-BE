@@ -17,6 +17,7 @@ const MAX_PROCESSING_MS = 30 * 60 * 1000;
 
 /**
  * PROCESSING이 끝날 때 슬롯·사용자 카운트를 해제하고 다음 대기 작업을 시작합니다.
+ * @params sessionId
  **/
 function releaseSlot(sessionId: string): void {
     const session = fittingStore.getSession(sessionId);
@@ -26,6 +27,10 @@ function releaseSlot(sessionId: string): void {
     processQueue().catch((err) => console.error('[Fitting] processQueue error:', err));
 }
 
+/**
+ * 대기열에 등록된 3D 피팅 작업을 처리합니다.
+ * 사용 가능한 동시 처리 슬롯만큼 작업을 선점한 후 병렬로 Meshy 작업을 시작합니다.
+ */
 async function processQueue(): Promise<void> {
     const slots = MAX_CONCURRENT - fittingStore.getActiveCount();
     if (slots <= 0 || fittingStore.getQueueLength() === 0) return;
@@ -60,6 +65,12 @@ async function processQueue(): Promise<void> {
     );
 }
 
+/**
+ * Meshy 3D 생성 작업을 시작합니다.
+ * 작업 ID를 세션에 저장하고 PROCESSING 상태로 전환한 뒤 상태 조회(Polling)를 예약합니다.
+ * @params sessionId
+ * @params imageUrl
+ */
 async function startMeshTask(sessionId: string, imageUrl: string): Promise<void> {
     // activeCount는 호출 전에 이미 증가됨
     const session = fittingStore.getSession(sessionId);
@@ -68,9 +79,9 @@ async function startMeshTask(sessionId: string, imageUrl: string): Promise<void>
         return;
     }
 
-    let meshRes: Response;
+    let meshData: { result?: string };
     try {
-        meshRes = await meshFetch('/image-to-3d', {
+        const meshRes = await meshFetch('/image-to-3d', {
             method: 'POST',
             body: JSON.stringify({
                 image_url: imageUrl,
@@ -79,6 +90,8 @@ async function startMeshTask(sessionId: string, imageUrl: string): Promise<void>
                 target_formats: ['glb'],
             }),
         });
+        // .json() 파싱도 try 안에 둬야 본문이 비정상일 때 슬롯/카운트가 누수되지 않는다.
+        meshData = (await meshRes.json()) as { result?: string };
     } catch (err) {
         // meshFetch는 non-2xx 응답에서 MeshApiError를 throw한다.
         console.error(`[Fitting] Mesh API 요청 실패 (${sessionId}):`, err);
@@ -88,7 +101,6 @@ async function startMeshTask(sessionId: string, imageUrl: string): Promise<void>
         return;
     }
 
-    const meshData = (await meshRes.json()) as { result?: string };
     if (!meshData.result) {
         console.error(`[Fitting] Mesh API task ID 없음 (${sessionId})`);
         session.status = 'FAILED';
@@ -105,7 +117,11 @@ async function startMeshTask(sessionId: string, imageUrl: string): Promise<void>
     setTimeout(() => pollMeshStatus(sessionId), POLL_INTERVAL_MS);
 }
 
-// ─── 세션 조회 ───────────────────────────────────────────────────
+/**
+ * 3D 피팅 세션을 조회하고 유효성을 검사합니다.
+ * 존재하지 않거나 만료된 세션은 삭제 후 예외를 발생시킵니다.
+ * @params sessionId
+ */
 function getSession(sessionId: string): FittingSession {
     const session = fittingStore.getSession(sessionId);
     if (!session || session.expiresAt < Date.now()) {
@@ -115,7 +131,11 @@ function getSession(sessionId: string): FittingSession {
     return session;
 }
 
-// ─── Mesh AI 상태 폴링 ───────────────────────────────────────────
+/**
+ * Meshy 작업 상태를 주기적으로 조회하여
+ * 진행률 및 결과 정보를 세션에 반영합니다.
+ * @param sessionId
+ */
 async function pollMeshStatus(sessionId: string): Promise<void> {
     const session = fittingStore.getSession(sessionId);
     if (!session || session.expiresAt < Date.now() || session.status !== 'PROCESSING') return;
@@ -185,7 +205,12 @@ async function pollMeshStatus(sessionId: string): Promise<void> {
     }
 }
 
-// ─── Public API ──────────────────────────────────────────────────
+/**
+ * 3D 피팅 작업을 생성합니다.
+ * 사용자별 요청 수를 제한하고 세션을 생성한 뒤 즉시 실행하거나 대기열에 등록합니다.
+ * @param userId
+ * @param closetArchiveId
+ */
 export const start3DFitting = async (userId: string, closetArchiveId: string): Promise<string> => {
     // 사용자당 동시 요청 제한 - await 이전에 선점해 race condition 방지
     if (fittingStore.getUserCount(userId) >= MAX_PER_USER) {
@@ -250,6 +275,12 @@ export const start3DFitting = async (userId: string, closetArchiveId: string): P
     return sessionId;
 };
 
+/**
+ * 3D 피팅 작업의 현재 상태를 조회합니다.
+ * 세션 소유권을 검증한 후 진행 상태와 결과 정보를 반환합니다.
+ * @param userId
+ * @param sessionId
+ */
 export const get3DFittingStatus = (userId: string, sessionId: string) => {
     const session = getSession(sessionId);
 

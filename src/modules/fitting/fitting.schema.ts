@@ -35,3 +35,21 @@ export const SessionIdParamSchema = z
         sessionId: z.string().openapi({ example: '01968b1c-...' }),
     })
     .openapi('SessionIdParam');
+
+export const FittingTitleParamSchema = z
+    .object({
+        closetArchiveId: z.string().uuid().openapi({ description: '제목을 변경할 옷장 아카이브 ID', example: '01968b1c-...' }),
+    })
+    .openapi('FittingTitleParam');
+
+export const FittingTitleBodySchema = z
+    .object({
+        title: z.string().trim().min(1, '제목을 입력해주세요.').max(100, '제목은 100자 이하여야 합니다.').openapi({ description: '변경할 제목', example: '여름 데일리룩' }),
+    })
+    .openapi('FittingTitleBody');
+
+export const FittingTitleResponseSchema = z
+    .object({
+        message: z.string().openapi({ example: '제목이 변경되었습니다.' }),
+    })
+    .openapi('FittingTitleResponse');

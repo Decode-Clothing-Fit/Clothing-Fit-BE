@@ -296,3 +296,21 @@ export const get3DFittingStatus = (userId: string, sessionId: string) => {
         thumbnailUrl: session.thumbnailUrl ?? null,
     };
 };
+
+/**
+ * 3D 피팅 결과(옷장 아카이브)의 제목을 변경합니다.
+ * 소유권을 쿼리에 포함해(id + userId), 본인 소유가 아니거나 없으면 404를 반환합니다.
+ * @param userId
+ * @param closetArchiveId
+ * @param titleInput
+ */
+export const updateFittingTitle = async (userId: string, closetArchiveId: string, titleInput: string): Promise<void> => {
+    const { count } = await prisma.closetArchive.updateMany({
+        where: { id: closetArchiveId, userId },
+        data: { title: titleInput },
+    });
+
+    if (count === 0) {
+        throw new AppError(ErrorCode.CLOSET_NOT_FOUND, '옷장 아카이브를 찾을 수 없습니다.', 404);
+    }
+};

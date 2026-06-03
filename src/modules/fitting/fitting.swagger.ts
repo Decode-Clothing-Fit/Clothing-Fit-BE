@@ -1,6 +1,14 @@
 import { registry } from '@/config/registry';
 import { ErrorResponseSchema } from '@/common/schemas/api.schema';
-import { Fitting3DRequestSchema, Fitting3DStartResponseSchema, Fitting3DStatusResponseSchema, SessionIdParamSchema } from './fitting.schema';
+import {
+    Fitting3DRequestSchema,
+    Fitting3DStartResponseSchema,
+    Fitting3DStatusResponseSchema,
+    SessionIdParamSchema,
+    FittingTitleParamSchema,
+    FittingTitleBodySchema,
+    FittingTitleResponseSchema,
+} from './fitting.schema';
 
 registry.registerPath({
     method: 'post',
@@ -87,6 +95,45 @@ registry.registerPath({
         },
         500: {
             description: '서버 내부 오류',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+    },
+});
+
+registry.registerPath({
+    method: 'patch',
+    path: '/fitting/{closetArchiveId}/title',
+    tags: ['Fitting'],
+    summary: '피팅 결과 제목 변경',
+    description:
+        '피팅 결과(옷장 아카이브)의 제목을 변경합니다. ' +
+        '본인 소유의 아카이브만 변경할 수 있으며, 존재하지 않거나 소유자가 아니면 404를 반환합니다.',
+    security: [{ bearerAuth: [] }],
+    request: {
+        params: FittingTitleParamSchema,
+        body: {
+            content: {
+                'application/json': {
+                    schema: FittingTitleBodySchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            description: '제목 변경 성공',
+            content: { 'application/json': { schema: FittingTitleResponseSchema } },
+        },
+        400: {
+            description: '유효하지 않은 요청 (제목 형식 오류 또는 ID 형식 오류)',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        401: {
+            description: '인증 필요',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        404: {
+            description: '옷장 아카이브를 찾을 수 없음 (또는 소유자가 아님)',
             content: { 'application/json': { schema: ErrorResponseSchema } },
         },
     },

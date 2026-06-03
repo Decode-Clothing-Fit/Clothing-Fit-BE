@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '@/common/utils/async.handler';
-import { start3DFitting, get3DFittingStatus } from './fitting.service';
+import { start3DFitting, get3DFittingStatus, updateFittingTitle } from './fitting.service';
 import {StatusCodes} from "http-status-codes";
 
 export const start3DFittingController = asyncHandler(async (req: Request, res: Response) => {
@@ -31,5 +31,17 @@ export const get3DFittingStatusController = asyncHandler(async (req: Request, re
     res.status(StatusCodes.OK).json({
         message: STATUS_MESSAGES[result.status] ?? '3D 피팅 상태 조회',
         data: result,
+    });
+});
+
+export const updateFittingTitleController = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { closetArchiveId } = req.params;
+    const { title } = req.body;
+
+    await updateFittingTitle(userId, closetArchiveId, title);
+
+    res.status(StatusCodes.OK).json({
+        message: '제목이 변경되었습니다.',
     });
 });

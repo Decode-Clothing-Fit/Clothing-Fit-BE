@@ -16,7 +16,7 @@ model User {
   deletedAt    DateTime? @map("deleted_at")
 
   profile              Profile?
-  bodyInfo             BodyInfo[]
+  bodyInfo             BodyInfo?
   userCharacter        UserCharacter?
   closetArchives       ClosetArchive[]
   posts                Post[]
@@ -46,7 +46,7 @@ model Profile {
 
 model BodyInfo {
   id           String   @id @db.Uuid @default(uuid())
-  userId       String   @map("user_id") @db.Uuid
+  userId       String   @unique @map("user_id") @db.Uuid
   height       Int
   weight       Int
   measurements Json?

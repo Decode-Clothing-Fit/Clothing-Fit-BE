@@ -1,8 +1,9 @@
 import type { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '@/common/utils/async.handler';
-import { getProfile, checkNickname, updateNickname } from './profile.service';
-import type { CheckNicknameQuery, UpdateNicknameBody } from './profile.schema';
+import { getProfile, checkNickname, updateNickname,
+  getBodyInfo, updateBodyInfo } from './profile.service';
+import type { CheckNicknameQuery, UpdateNicknameBody, UpdateBodyInfoBody } from './profile.schema';
 
 export const getProfileController = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!.id;
@@ -34,5 +35,27 @@ export const updateNicknameController = asyncHandler(async (req: Request, res: R
 
   res.status(StatusCodes.OK).json({
     message: '닉네임 변경 성공',
+  });
+});
+
+export const getBodyInfoController = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+
+  const result = await getBodyInfo(userId);
+
+  res.status(StatusCodes.OK).json({
+    message: '체형 정보 조회 성공',
+    data: result,
+  });
+});
+
+export const updateBodyInfoController = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const body = req.body as UpdateBodyInfoBody;
+
+  await updateBodyInfo(userId, body);
+
+  res.status(StatusCodes.OK).json({
+    message: '체형 정보 수정 성공',
   });
 });

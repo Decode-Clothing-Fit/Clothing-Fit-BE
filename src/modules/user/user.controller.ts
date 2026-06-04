@@ -18,10 +18,7 @@ export const deleteUserController = asyncHandler(async (req: Request, res: Respo
 
    const result = await getUserProfile(id);
 
-   res.status(StatusCodes.OK).json({
-      message: '유저 프로필 조회 성공',
-      data: result
-   })
+   res.status(StatusCodes.OK).json({ data: result });
  })
 
  export const getUserPostsController = asyncHandler(async (req: Request, res: Response) =>
@@ -31,8 +28,5 @@ export const deleteUserController = asyncHandler(async (req: Request, res: Respo
 
    const result = await getUserPosts(id, requesterId, query);
 
-   res.status(StatusCodes.OK).json({
-      message: '타사용자 게시글 목록 조회 성공',
-      data: result
-   })
+   res.status(StatusCodes.OK).json({ data: result });
 })

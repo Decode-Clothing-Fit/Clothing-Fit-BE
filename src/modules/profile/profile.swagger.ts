@@ -2,6 +2,8 @@ import { registry } from '@/config/registry';
 import { z } from 'zod';
 import { ErrorResponseSchema } from '@/common/schemas/api.schema';
 import { profileResponseSchema, checkNicknameResponseSchema, bodyInfoResponseSchema } from './profile.schema';
+import { getPostsResponseSchema } from '../posts/posts.schema';
+import { MAX_PAGE_LIMIT } from '@/config/constants';
 
 // 내 프로필 조회
 registry.registerPath({
@@ -140,6 +142,93 @@ registry.registerPath({
           }),
         },
       },
+    },
+    400: {
+      description: '잘못된 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    401: {
+      description: '인증 실패',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});
+
+// 최근 조회한 커뮤니티 목록
+registry.registerPath({
+  method: 'get',
+  path: '/profile/recent-posts',
+  tags: ['Profile'],
+  summary: '최근 조회한 커뮤니티 목록',
+  security: [{ bearerAuth: [] }],
+  request: {
+    query: z.object({
+      cursor: z.string().uuid().optional(),
+      limit: z.coerce.number().int().min(1).max(MAX_PAGE_LIMIT).default(20).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: '조회 성공',
+      content: { 'application/json': { schema: getPostsResponseSchema } },
+    },
+    400: {
+      description: '잘못된 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    401: {
+      description: '인증 실패',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});
+
+// 북마크한 코디 목록
+registry.registerPath({
+  method: 'get',
+  path: '/profile/bookmarks',
+  tags: ['Profile'],
+  summary: '북마크한 코디 목록',
+  security: [{ bearerAuth: [] }],
+  request: {
+    query: z.object({
+      cursor: z.string().uuid().optional(),
+      limit: z.coerce.number().int().min(1).max(MAX_PAGE_LIMIT).default(20).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: '조회 성공',
+      content: { 'application/json': { schema: getPostsResponseSchema } },
+    },
+    400: {
+      description: '잘못된 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    401: {
+      description: '인증 실패',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});
+
+// 좋아요한 게시글 목록
+registry.registerPath({
+  method: 'get',
+  path: '/profile/interests',
+  tags: ['Profile'],
+  summary: '좋아요한 게시글 목록',
+  security: [{ bearerAuth: [] }],
+  request: {
+    query: z.object({
+      cursor: z.string().uuid().optional(),
+      limit: z.coerce.number().int().min(1).max(MAX_PAGE_LIMIT).default(20).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: '조회 성공',
+      content: { 'application/json': { schema: getPostsResponseSchema } },
     },
     400: {
       description: '잘못된 요청',

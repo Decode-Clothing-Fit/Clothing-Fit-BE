@@ -28,6 +28,8 @@ export const bodyInfoResponseSchema = z.object({
     waist: z.number().nullable(),
     hip: z.number().nullable(),
     shoulder: z.number().nullable(),
+    head: z.number().nullable(),
+    footSize: z.number().nullable(),
 }).openapi('BodyInfoResponse');
 
 export const updateBodyInfoSchema = z.object({
@@ -37,6 +39,8 @@ export const updateBodyInfoSchema = z.object({
     waist: z.number().int().min(1).max(300).optional(),
     hip: z.number().int().min(1).max(300).optional(),
     shoulder: z.number().int().min(1).max(300).optional(),
+    head: z.number().int().min(1).max(100).optional(),
+    footSize: z.number().int().min(1).max(400).optional(),
 })
 
 export type UpdateBodyInfoBody = z.infer<typeof updateBodyInfoSchema>;

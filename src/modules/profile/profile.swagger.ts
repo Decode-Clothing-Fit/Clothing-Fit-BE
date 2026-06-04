@@ -123,6 +123,8 @@ registry.registerPath({
             waist: z.number().optional().openapi({ example: 80 }),
             hip: z.number().optional().openapi({ example: 95 }),
             shoulder: z.number().optional().openapi({ example: 45 }),
+            head: z.number().optional().openapi({ example: 57 }),
+            footSize: z.number().optional().openapi({ example: 270 }),
           }),
         },
       },

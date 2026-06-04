@@ -67,6 +67,8 @@ export const getBodyInfo = async (userId: string) => {
     waist?: number;
     hip?: number;
     shoulder?: number;
+    head?: number;
+    footSize?: number;
   } | null;
 
   return {
@@ -76,6 +78,8 @@ export const getBodyInfo = async (userId: string) => {
     waist: measurements?.waist ?? null,
     hip: measurements?.hip ?? null,
     shoulder: measurements?.shoulder ?? null,
+    head: measurements?.head ?? null,
+    footSize: measurements?.footSize ?? null,
   }
 }
 
@@ -91,13 +95,17 @@ export const updateBodyInfo = async (userId: string, body: UpdateBodyInfoBody): 
     waist?: number;
     hip?: number;
     shoulder?: number;
+    head?: number;
+    footSize?: number;
   } | null;
 
   const measurements = {
     chest: chest ?? prevMeasurements?.chest,
     waist: waist ?? prevMeasurements?.waist, 
     hip: hip ?? prevMeasurements?. hip, 
-    shoulder: shoulder ?? prevMeasurements?.shoulder
+    shoulder: shoulder ?? prevMeasurements?.shoulder,
+    head: head ?? prevMeasurements?.head,
+    footSize: footSize ?? prevMeasurements?.footSize,
   };
 
   await prisma.bodyInfo.upsert({

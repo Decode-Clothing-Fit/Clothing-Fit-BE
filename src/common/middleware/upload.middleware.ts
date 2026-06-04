@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
+import { StatusCodes } from 'http-status-codes';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 
@@ -42,13 +43,13 @@ export const singleImageUpload = (options: ImageUploadOptions) => {
             if (err instanceof multer.MulterError) {
                 if (err.code === 'LIMIT_FILE_SIZE') {
                     const maxMb = Math.floor(maxSizeBytes / (1024 * 1024));
-                    return next(new AppError(ErrorCode.FILE_TOO_LARGE, `이미지는 ${maxMb}MB 이하여야 합니다.`, 413));
+                    return next(new AppError(ErrorCode.FILE_TOO_LARGE, `이미지는 ${maxMb}MB 이하여야 합니다.`, StatusCodes.REQUEST_TOO_LONG));
                 }
                 return next(new AppError(ErrorCode.INVALID_FILE_TYPE, '파일 업로드에 실패했습니다.', 400));
             }
             // fileFilter에서 던진 형식 오류 등
             const message = err instanceof Error ? err.message : '파일 업로드에 실패했습니다.';
-            return next(new AppError(ErrorCode.INVALID_FILE_TYPE, message, 400));
+            return next(new AppError(ErrorCode.INVALID_FILE_TYPE, message, StatusCodes.BAD_REQUEST));
         });
     };
 };

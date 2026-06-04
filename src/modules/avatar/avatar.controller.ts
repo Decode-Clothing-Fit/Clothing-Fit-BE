@@ -29,7 +29,7 @@ export const updateUserAvatarImageController = asyncHandler(async (req: Request,
     const userId = req.user!.id;
 
     if (!req.file) {
-        throw new AppError(ErrorCode.INVALID_FILE_TYPE, '이미지 파일이 필요합니다.', 400);
+        throw new AppError(ErrorCode.INVALID_FILE_TYPE, '이미지 파일이 필요합니다.', StatusCodes.BAD_REQUEST);
     }
 
     const avatar = await updateUserAvatarImage(userId, req.file.buffer);

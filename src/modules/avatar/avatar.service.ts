@@ -1,6 +1,7 @@
 import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { uuidv7 } from "uuidv7";
 import sharp from "sharp";
+import { StatusCodes } from "http-status-codes";
 import prisma from "@/lib/prisma/extensions";
 import { AppError } from "@/common/errors/app-error";
 import { ErrorCode } from "@/common/errors/error-code";
@@ -53,14 +54,14 @@ export const getUserAvatar = async (userId: string): Promise<UserAvatar> => {
     });
 
     if (!userCharacter) {
-        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '사용자의 아바타를 찾을 수 없습니다.', 404);
+        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '사용자의 아바타를 찾을 수 없습니다.', StatusCodes.NOT_FOUND);
     }
 
     // 업로드 이미지가 있으면 그것을, 없으면 연결된 캐릭터의 이미지를 사용
     const imageUrl = userCharacter.imageUrl ?? userCharacter.character?.imageUrl;
 
     if (!imageUrl) {
-        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '아바타 이미지가 존재하지 않습니다.', 404);
+        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '아바타 이미지가 존재하지 않습니다.', StatusCodes.NOT_FOUND);
     }
 
     return {
@@ -82,7 +83,7 @@ export const updateUserAvatar = async (userId: string, characterId: string): Pro
     });
 
     if (!character) {
-        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '캐릭터를 찾을 수 없습니다.', 404);
+        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '캐릭터를 찾을 수 없습니다.', StatusCodes.NOT_FOUND);
     }
 
     // 캐릭터로 전환하면 기존 업로드 이미지는 사라지므로, 정리를 위해 이전 키를 미리 확보
@@ -91,7 +92,7 @@ export const updateUserAvatar = async (userId: string, characterId: string): Pro
         select: { imageUrl: true },
     });
     if (!existing) {
-        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '사용자의 아바타를 찾을 수 없습니다.', 404);
+        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '사용자의 아바타를 찾을 수 없습니다.', StatusCodes.NOT_FOUND);
     }
 
     await prisma.userCharacter.update({
@@ -126,11 +127,11 @@ export const updateUserAvatarImage = async (userId: string, buffer: Buffer): Pro
     try {
         format = (await image.metadata()).format;
     } catch {
-        throw new AppError(ErrorCode.INVALID_FILE_TYPE, '유효한 이미지 파일이 아닙니다.', 400);
+        throw new AppError(ErrorCode.INVALID_FILE_TYPE, '유효한 이미지 파일이 아닙니다.', StatusCodes.BAD_REQUEST);
     }
     const ext = format ? ALLOWED_IMAGE_FORMATS[format] : undefined;
     if (!ext) {
-        throw new AppError(ErrorCode.INVALID_FILE_TYPE, '지원하지 않는 이미지 형식입니다. (png, jpeg, webp만 허용)', 400);
+        throw new AppError(ErrorCode.INVALID_FILE_TYPE, '지원하지 않는 이미지 형식입니다. (png, jpeg, webp만 허용)', StatusCodes.BAD_REQUEST);
     }
 
     // EXIF(GPS 등 개인정보) 제거 + orientation 보정 + 과대 이미지 축소 후 재인코딩.
@@ -143,7 +144,7 @@ export const updateUserAvatarImage = async (userId: string, buffer: Buffer): Pro
             .toFormat(format as 'png' | 'jpeg' | 'webp')
             .toBuffer();
     } catch {
-        throw new AppError(ErrorCode.INVALID_FILE_TYPE, '이미지 처리에 실패했습니다.', 400);
+        throw new AppError(ErrorCode.INVALID_FILE_TYPE, '이미지 처리에 실패했습니다.', StatusCodes.BAD_REQUEST);
     }
 
     // (4) S3에 올리기 전에 사용자 아바타 존재를 먼저 확인 → 업로드 orphan 방지
@@ -153,7 +154,7 @@ export const updateUserAvatarImage = async (userId: string, buffer: Buffer): Pro
         select: { imageUrl: true },
     });
     if (!existing) {
-        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '사용자의 아바타를 찾을 수 없습니다.', 404);
+        throw new AppError(ErrorCode.CHARACTER_NOT_FOUND, '사용자의 아바타를 찾을 수 없습니다.', StatusCodes.NOT_FOUND);
     }
     const oldKey = extractAvatarS3Key(existing.imageUrl);
 

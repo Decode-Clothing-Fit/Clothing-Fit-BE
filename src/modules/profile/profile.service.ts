@@ -123,7 +123,7 @@ export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) =
 
   const views = await prisma.postView.findMany({
     where: { userId },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
     select: {
       id: true,
@@ -169,7 +169,7 @@ export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuer
 
   const bookmarks = await prisma.postBookmark.findMany({
     where: { userId },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
     select: {
       id: true,
@@ -215,7 +215,7 @@ export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) =>
 
   const likes = await prisma.postLike.findMany({
     where: { userId },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
     select: {
       id: true,

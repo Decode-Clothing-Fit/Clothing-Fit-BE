@@ -3,7 +3,7 @@ import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import type { UpdateBodyInfoBody, UpdateNicknameBody,
    updateBodyInfoSchema, ProfilePostsQuery } from './profile.schema';
-import { buildPaginationResult } from '@/common/utils/pagination';
+
 
 export const getProfile = async (userId: string) => {
   const user = await prisma.user.findFirst({
@@ -142,8 +142,8 @@ export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) =
   });
 
   const items = views.map((view) => ({
-    id: view.id,
-    postId: view.post.id,
+    id: view.post.id,
+    cursorId: view.id,
     nickname: view.post.user.profile?.nickname ?? null,
     imageUrl: view.post.closetArchive.imageUrl,
     likeCount: view.post._count.postLikes,
@@ -152,7 +152,15 @@ export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) =
     isBookmarked: view.post.postBookmarks.length > 0,
   }));
 
-  return buildPaginationResult(items, limit);
+  const hasMore = items.length > limit;
+  const data = hasMore ? items.slice(0, limit) : items;
+  const nextCursor = hasMore ? data[data.length - 1]?.cursorId ?? null : null;
+
+  return {
+    data: data.map(({ cursorId, ...rest }) => rest),
+    nextCursor,
+    hasMore,
+  };
 };
 
 // 북마크한 코디 목록
@@ -180,8 +188,8 @@ export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuer
   });
 
   const items = bookmarks.map((bookmark) => ({
-    id: bookmark.id,
-    postId: bookmark.post.id,
+    id: bookmark.post.id,
+    cursorId: bookmark.id,
     nickname: bookmark.post.user.profile?.nickname ?? null,
     imageUrl: bookmark.post.closetArchive.imageUrl,
     likeCount: bookmark.post._count.postLikes,
@@ -190,7 +198,15 @@ export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuer
     isBookmarked: bookmark.post.postBookmarks.length > 0,
   }));
 
-  return buildPaginationResult(items, limit);
+  const hasMore = items.length > limit;
+  const data = hasMore ? items.slice(0, limit) : items;
+  const nextCursor = hasMore ? data[data.length - 1]?.cursorId ?? null : null;
+
+  return {
+    data: data.map(({ cursorId, ...rest }) => rest),
+    nextCursor,
+    hasMore,
+  };
 };
 
 // 좋아요한 게시글 목록
@@ -218,8 +234,8 @@ export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) =>
   });
 
   const items = likes.map((like) => ({
-    id: like.id,
-    postId: like.post.id,
+    id: like.post.id,
+    cursorId: like.id,
     nickname: like.post.user.profile?.nickname ?? null,
     imageUrl: like.post.closetArchive.imageUrl,
     likeCount: like.post._count.postLikes,
@@ -228,5 +244,13 @@ export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) =>
     isBookmarked: like.post.postBookmarks.length > 0,
   }));
 
-  return buildPaginationResult(items, limit);
+  const hasMore = items.length > limit;
+  const data = hasMore ? items.slice(0, limit) : items;
+  const nextCursor = hasMore ? data[data.length - 1]?.cursorId ?? null : null;
+
+  return {
+    data: data.map(({ cursorId, ...rest }) => rest),
+    nextCursor,
+    hasMore,
+  };
 };

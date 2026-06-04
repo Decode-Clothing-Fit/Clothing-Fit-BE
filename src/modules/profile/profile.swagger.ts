@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ErrorResponseSchema } from '@/common/schemas/api.schema';
 import { profileResponseSchema, checkNicknameResponseSchema, bodyInfoResponseSchema } from './profile.schema';
 import { getPostsResponseSchema } from '../posts/posts.schema';
+import { MAX_PAGE_LIMIT } from '@/config/constants';
 
 // 내 프로필 조회
 registry.registerPath({
@@ -163,13 +164,17 @@ registry.registerPath({
   request: {
     query: z.object({
       cursor: z.string().uuid().optional(),
-      limit: z.number().optional(),
+      limit: z.coerce.number().int().min(1).max(MAX_PAGE_LIMIT).default(20).optional(),
     }),
   },
   responses: {
     200: {
       description: '조회 성공',
       content: { 'application/json': { schema: getPostsResponseSchema } },
+    },
+    400: {
+      description: '잘못된 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
     },
     401: {
       description: '인증 실패',
@@ -188,13 +193,17 @@ registry.registerPath({
   request: {
     query: z.object({
       cursor: z.string().uuid().optional(),
-      limit: z.number().optional(),
+      limit: z.coerce.number().int().min(1).max(MAX_PAGE_LIMIT).default(20).optional(),
     }),
   },
   responses: {
     200: {
       description: '조회 성공',
       content: { 'application/json': { schema: getPostsResponseSchema } },
+    },
+    400: {
+      description: '잘못된 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
     },
     401: {
       description: '인증 실패',
@@ -213,13 +222,17 @@ registry.registerPath({
   request: {
     query: z.object({
       cursor: z.string().uuid().optional(),
-      limit: z.number().optional(),
+      limit: z.coerce.number().int().min(1).max(MAX_PAGE_LIMIT).default(20).optional(),
     }),
   },
   responses: {
     200: {
       description: '조회 성공',
       content: { 'application/json': { schema: getPostsResponseSchema } },
+    },
+    400: {
+      description: '잘못된 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
     },
     401: {
       description: '인증 실패',

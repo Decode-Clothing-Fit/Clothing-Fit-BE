@@ -2,8 +2,6 @@ import type { Request, Response } from "express";
 import type { ApiResponse } from "@/common/types/api";
 import { StatusCodes } from "http-status-codes";
 import { asyncHandler } from "@/common/utils/async.handler";
-import { AppError } from "@/common/errors/app-error";
-import { ErrorCode } from "@/common/errors/error-code";
 import {getUserAvatar, updateUserAvatar, updateUserAvatarImage, type UserAvatar} from "./avatar.service";
 
 export const getUserAvatarController = asyncHandler(async (req: Request, res: Response) => {
@@ -27,13 +25,9 @@ export const updateUserAvatarController = asyncHandler(async (req: Request, res:
 
 export const updateUserAvatarImageController = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user!.id;
+    // 파일 존재/형식/용량 검증은 singleImageUpload 미들웨어가 보장
+    const avatar = await updateUserAvatarImage(userId, req.file!.buffer);
 
-    if (!req.file) {
-        throw new AppError(ErrorCode.INVALID_FILE_TYPE, '이미지 파일이 필요합니다.', StatusCodes.BAD_REQUEST);
-    }
-
-    const avatar = await updateUserAvatarImage(userId, req.file.buffer);
     const result: ApiResponse<UserAvatar> = { data: avatar };
-
     res.status(StatusCodes.OK).json(result);
 })

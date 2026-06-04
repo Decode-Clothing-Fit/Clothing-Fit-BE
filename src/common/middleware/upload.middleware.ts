@@ -11,6 +11,8 @@ type ImageUploadOptions = {
     maxSizeBytes?: number;
     /** 허용 MIME 화이트리스트. 기본 png/jpeg/webp */
     allowedMime?: string[];
+    /** 파일을 필수로 요구할지. 기본 true (없으면 400) */
+    required?: boolean;
 };
 
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024;
@@ -22,7 +24,7 @@ const DEFAULT_ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'];
  * multer 에러(용량 초과/형식 오류)를 적절한 상태코드의 AppError로 변환합니다.
  */
 export const singleImageUpload = (options: ImageUploadOptions) => {
-    const { field, maxSizeBytes = DEFAULT_MAX_SIZE, allowedMime = DEFAULT_ALLOWED_MIME } = options;
+    const { field, maxSizeBytes = DEFAULT_MAX_SIZE, allowedMime = DEFAULT_ALLOWED_MIME, required = true } = options;
 
     const upload = multer({
         storage: multer.memoryStorage(),
@@ -39,13 +41,18 @@ export const singleImageUpload = (options: ImageUploadOptions) => {
 
     return (req: Request, res: Response, next: NextFunction): void => {
         upload.single(field)(req, res, (err: unknown) => {
-            if (!err) return next();
+            if (!err) {
+                if (required && !req.file) {
+                    return next(new AppError(ErrorCode.INVALID_FILE_TYPE, '이미지 파일이 필요합니다.', StatusCodes.BAD_REQUEST));
+                }
+                return next();
+            }
             if (err instanceof multer.MulterError) {
                 if (err.code === 'LIMIT_FILE_SIZE') {
                     const maxMb = Math.floor(maxSizeBytes / (1024 * 1024));
                     return next(new AppError(ErrorCode.FILE_TOO_LARGE, `이미지는 ${maxMb}MB 이하여야 합니다.`, StatusCodes.REQUEST_TOO_LONG));
                 }
-                return next(new AppError(ErrorCode.INVALID_FILE_TYPE, '파일 업로드에 실패했습니다.', 400));
+                return next(new AppError(ErrorCode.INVALID_FILE_TYPE, '파일 업로드에 실패했습니다.', StatusCodes.BAD_REQUEST));
             }
             // fileFilter에서 던진 형식 오류 등
             const message = err instanceof Error ? err.message : '파일 업로드에 실패했습니다.';

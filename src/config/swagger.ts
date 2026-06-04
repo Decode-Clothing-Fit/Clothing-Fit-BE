@@ -13,6 +13,7 @@ import '@/modules/fitting/fitting.swagger';
 import '@/modules/home/home.swagger';
 import '@/modules/user/user.swagger';
 import '@/modules/profile/profile.swagger';
+import '@/modules/avatar/avatar.swagger';
 
 const generateOpenApiDocument = (): OpenAPIObject => {
   const generator = new OpenApiGeneratorV3(registry.definitions);

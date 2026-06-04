@@ -9,6 +9,7 @@ import fittingRouter from '@/modules/fitting/fitting.route';
 import homeRouter from '@/modules/home/home.route';
 import userRouter from '../modules/user/user.route';
 import profileRouter from '../modules/profile/profile.route';
+import avatarRoute from "@/modules/avatar/avatar.route";
 
 export const router: RouterType = Router();
 
@@ -23,4 +24,5 @@ router.use('/fitting', fittingRouter);
 
 router.use('/home', homeRouter);
 router.use('/profile', profileRouter);
+router.use('/avatar', avatarRoute)
 

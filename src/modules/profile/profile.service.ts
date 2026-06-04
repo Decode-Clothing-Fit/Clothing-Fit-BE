@@ -1,7 +1,9 @@
 import prisma from '@/lib/prisma/extensions';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
-import type { UpdateBodyInfoBody, UpdateNicknameBody, updateBodyInfoSchema } from './profile.schema';
+import type { UpdateBodyInfoBody, UpdateNicknameBody,
+   updateBodyInfoSchema, ProfilePostsQuery } from './profile.schema';
+import { buildPaginationResult } from '@/common/utils/pagination';
 
 export const getProfile = async (userId: string) => {
   const user = await prisma.user.findFirst({
@@ -114,3 +116,117 @@ export const updateBodyInfo = async (userId: string, body: UpdateBodyInfoBody): 
     create: { userId, height, weight, measurements }
   })
 }
+
+// 최근 조회한 커뮤니티 목록
+export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) => {
+  const { cursor, limit } = query;
+
+  const views = await prisma.postView.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: limit + 1,
+    select: {
+      id: true,
+      post: {
+        select: {
+          id: true,
+          closetArchive: { select: { imageUrl: true } },
+          _count: { select: { postLikes: true, postBookmarks: true } },
+          postLikes: { where: { userId }, select: { id: true }, take: 1 },
+          postBookmarks: { where: { userId }, select: { id: true }, take: 1 },
+          user: { select: { profile: { select: { nickname: true } } } },
+        },
+      },
+    },
+    ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+  });
+
+  const items = views.map((view) => ({
+    id: view.id,
+    postId: view.post.id,
+    nickname: view.post.user.profile?.nickname ?? null,
+    imageUrl: view.post.closetArchive.imageUrl,
+    likeCount: view.post._count.postLikes,
+    isLiked: view.post.postLikes.length > 0,
+    bookmarkCount: view.post._count.postBookmarks,
+    isBookmarked: view.post.postBookmarks.length > 0,
+  }));
+
+  return buildPaginationResult(items, limit);
+};
+
+// 북마크한 코디 목록
+export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuery) => {
+  const { cursor, limit } = query;
+
+  const bookmarks = await prisma.postBookmark.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: limit + 1,
+    select: {
+      id: true,
+      post: {
+        select: {
+          id: true,
+          closetArchive: { select: { imageUrl: true } },
+          _count: { select: { postLikes: true, postBookmarks: true } },
+          postLikes: { where: { userId }, select: { id: true }, take: 1 },
+          postBookmarks: { where: { userId }, select: { id: true }, take: 1 },
+          user: { select: { profile: { select: { nickname: true } } } },
+        },
+      },
+    },
+    ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+  });
+
+  const items = bookmarks.map((bookmark) => ({
+    id: bookmark.id,
+    postId: bookmark.post.id,
+    nickname: bookmark.post.user.profile?.nickname ?? null,
+    imageUrl: bookmark.post.closetArchive.imageUrl,
+    likeCount: bookmark.post._count.postLikes,
+    isLiked: bookmark.post.postLikes.length > 0,
+    bookmarkCount: bookmark.post._count.postBookmarks,
+    isBookmarked: bookmark.post.postBookmarks.length > 0,
+  }));
+
+  return buildPaginationResult(items, limit);
+};
+
+// 좋아요한 게시글 목록
+export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) => {
+  const { cursor, limit } = query;
+
+  const likes = await prisma.postLike.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: limit + 1,
+    select: {
+      id: true,
+      post: {
+        select: {
+          id: true,
+          closetArchive: { select: { imageUrl: true } },
+          _count: { select: { postLikes: true, postBookmarks: true } },
+          postLikes: { where: { userId }, select: { id: true }, take: 1 },
+          postBookmarks: { where: { userId }, select: { id: true }, take: 1 },
+          user: { select: { profile: { select: { nickname: true } } } },
+        },
+      },
+    },
+    ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+  });
+
+  const items = likes.map((like) => ({
+    id: like.id,
+    postId: like.post.id,
+    nickname: like.post.user.profile?.nickname ?? null,
+    imageUrl: like.post.closetArchive.imageUrl,
+    likeCount: like.post._count.postLikes,
+    isLiked: like.post.postLikes.length > 0,
+    bookmarkCount: like.post._count.postBookmarks,
+    isBookmarked: like.post.postBookmarks.length > 0,
+  }));
+
+  return buildPaginationResult(items, limit);
+};

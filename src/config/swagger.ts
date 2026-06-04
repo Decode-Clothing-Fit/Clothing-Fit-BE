@@ -9,6 +9,7 @@ import '@/modules/characters/character.swagger';
 import '@/modules/follows/follows.swagger';
 import '@/modules/auth/auth.swagger';
 import '@/modules/closet/closet.swagger';
+import '@/modules/fitting/fitting.swagger';
 import '@/modules/home/home.swagger';
 import '@/modules/user/user.swagger';
 import '@/modules/profile/profile.swagger';

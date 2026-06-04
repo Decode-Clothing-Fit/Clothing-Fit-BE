@@ -57,7 +57,7 @@ registry.registerPath({
             content: { 'application/json': { schema: UserAvatarResponseSchema } },
         },
         400: {
-            description: '이미지 파일 누락 또는 형식 오류',
+            description: '이미지 파일 누락 또는 형식 오류 (png/jpeg/webp 아님, 위장 파일 등)',
             content: { 'application/json': { schema: ErrorResponseSchema } },
         },
         401: {
@@ -66,6 +66,10 @@ registry.registerPath({
         },
         404: {
             description: '사용자 아바타를 찾을 수 없음',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        413: {
+            description: '이미지 용량 초과 (최대 5MB)',
             content: { 'application/json': { schema: ErrorResponseSchema } },
         },
     },

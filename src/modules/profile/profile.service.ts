@@ -3,6 +3,11 @@ import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import type { UpdateBodyInfoBody, UpdateNicknameBody,
    updateBodyInfoSchema, ProfilePostsQuery } from './profile.schema';
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { s3Client, S3_BUCKET } from '@/lib/storage/s3';
+import { v4 as uuidv4 } from 'uuid';
+import sharp from 'sharp';
+import { env } from '@/config/env';
 
 
 export const getProfile = async (userId: string) => {
@@ -117,7 +122,6 @@ export const updateBodyInfo = async (userId: string, body: UpdateBodyInfoBody): 
   })
 }
 
-// 최근 조회한 커뮤니티 목록
 export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) => {
   const { cursor, limit } = query;
 
@@ -163,7 +167,6 @@ export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) =
   };
 };
 
-// 북마크한 코디 목록
 export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuery) => {
   const { cursor, limit } = query;
 
@@ -209,7 +212,6 @@ export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuer
   };
 };
 
-// 좋아요한 게시글 목록
 export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) => {
   const { cursor, limit } = query;
 
@@ -253,4 +255,36 @@ export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) =>
     nextCursor,
     hasMore,
   };
+};
+
+export const updateProfileImage = async (userId: string, file: Express.Multer.File): Promise<void> => {
+  const webpBuffer = await sharp(file.buffer)
+    .resize(400, 400, { fit: 'cover' })
+    .webp({ quality: 80 })
+    .toBuffer();
+
+  const key = `profiles/${userId}/${uuidv4()}.webp`;
+
+  await s3Client.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: key,
+    Body: webpBuffer,
+    ContentType: 'image/webp',
+  }));
+
+  const imageUrl = `https://${S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+
+  const existing = await prisma.profile.findUnique({ where: { userId } });
+  if (existing?.imageUrl) {
+    const oldKey = existing.imageUrl.split('.amazonaws.com/')[1];
+    if (oldKey) {
+      await s3Client.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: oldKey }));
+    }
+  }
+
+  await prisma.profile.upsert({
+    where: { userId },
+    update: { imageUrl },
+    create: { userId, imageUrl, nickname: `user_${userId}`, gender: 'MALE' },
+  });
 };

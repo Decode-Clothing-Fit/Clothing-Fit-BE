@@ -139,6 +139,10 @@ registry.registerPath({
         },
       },
     },
+    400: {
+      description: '잘못된 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
     401: {
       description: '인증 실패',
       content: { 'application/json': { schema: ErrorResponseSchema } },

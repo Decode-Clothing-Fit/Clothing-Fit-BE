@@ -26,7 +26,7 @@ export const getPostsService = async (query: GetPostsQuery, userId: string) => {
         },
         ...(hasBodyFilter && {
           bodyInfo: {
-            some: {
+            is: {
               ...(height !== undefined && { height }),
               ...((weightMin !== undefined || weightMax !== undefined) && {
                 weight: {

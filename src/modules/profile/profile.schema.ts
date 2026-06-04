@@ -1,3 +1,4 @@
+import { MAX_PAGE_LIMIT } from '@/config/constants';
 import { z } from 'zod';
 
 export const profileResponseSchema = z.object({
@@ -44,3 +45,10 @@ export const updateBodyInfoSchema = z.object({
 })
 
 export type UpdateBodyInfoBody = z.infer<typeof updateBodyInfoSchema>;
+
+export const profilePostsQuerySchema = z.object({
+    cursor: z.string().uuid().optional(), limit:
+    z.coerce.number().int().min(1).max(MAX_PAGE_LIMIT).default(20)
+})
+
+export type ProfilePostsQuery = z.infer<typeof profilePostsQuerySchema>;

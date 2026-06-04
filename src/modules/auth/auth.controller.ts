@@ -8,10 +8,7 @@ export const kakaoLoginController = asyncHandler(async (req: Request, res: Respo
 
     const result = await kakaoLogin(accessToken);
 
-    res.status(StatusCodes.OK).json({
-        message: '카카오 로그인 성공',
-        data: result,
-    })
+    res.status(StatusCodes.OK).json({ data: result });
 })
 
 export const logoutController = asyncHandler(async (req: Request, res: Response) => {
@@ -19,9 +16,7 @@ export const logoutController = asyncHandler(async (req: Request, res: Response)
 
   await logout(refreshToken);
 
-  res.status(StatusCodes.OK).json({
-    message: '로그아웃 성공',
-  });
+  res.status(StatusCodes.OK).send();
 });
 
 export const refreshController = asyncHandler(async (req: Request, res: Response) => {
@@ -29,10 +24,7 @@ export const refreshController = asyncHandler(async (req: Request, res: Response
 
   const result = await refresh(refreshToken);
 
-  res.status(StatusCodes.OK).json({
-    message: '토큰 재발급 성공',
-    data: result,
-  });
+  res.status(StatusCodes.OK).json({ data: result });
 });
 
 export const googleLoginController = asyncHandler(async (req: Request, res: Response) => {
@@ -40,8 +32,5 @@ export const googleLoginController = asyncHandler(async (req: Request, res: Resp
 
     const result = await googleLogin(idToken);
 
-    res.status(StatusCodes.OK).json({
-        message: '구글 로그인 성공',
-        data: result,
-    })
+    res.status(StatusCodes.OK).json({ data: result });
 })

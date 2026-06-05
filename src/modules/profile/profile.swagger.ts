@@ -172,9 +172,7 @@ registry.registerPath({
       description: '조회 성공',
       content: {
         'application/json': {
-          schema: z.object({
-            data: getPostsResponseSchema,
-          }),
+          schema: getPostsResponseSchema,
         },
       },
     },
@@ -207,9 +205,7 @@ registry.registerPath({
       description: '조회 성공',
       content: {
         'application/json': {
-          schema: z.object({
-            data: getPostsResponseSchema,
-          }),
+          schema: getPostsResponseSchema,
         },
       },
     },
@@ -242,9 +238,7 @@ registry.registerPath({
       description: '조회 성공',
       content: {
         'application/json': {
-          schema: z.object({
-            data: getPostsResponseSchema,
-          }),
+          schema: getPostsResponseSchema,
         },
       },
     },

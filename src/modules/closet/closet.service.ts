@@ -4,6 +4,7 @@ import { buildPaginationResult } from '@/common/utils/pagination';
 import type { CursorPaginationParams, CursorPaginationResult } from '@/common/utils/pagination';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
+import { StatusCodes } from 'http-status-codes';
 
 export type ClosetItemSummary = {
   id: string;
@@ -124,4 +125,65 @@ export const getClosetDetail = async (
     isPublished: archive.post !== null,
     closetItems: archive.closetItems,
   };
+};
+
+export const deleteCloset = async (userId: string, closetArchiveId: string): Promise<void> => {
+  const archive = await prisma.closetArchive.findUnique({
+    where: { id: closetArchiveId },
+    select: {
+      userId: true,
+      post: { select: { id: true }}
+    }
+  })
+
+  if (!archive) {
+    throw new AppError(ErrorCode.CLOSET_NOT_FOUND, ' 존재하지 않는 옷장입니다.', StatusCodes.NOT_FOUND)
+  }
+
+  if (archive.userId !== userId) {
+    throw new AppError(ErrorCode.NOT_CLOSET_OWNER, '접근권한이 없습니다.', StatusCodes.FORBIDDEN);
+  }
+
+  if (archive.post) {
+    await prisma.post.delete({ where: {
+      id:archive.post.id
+    }})
+  }
+
+  await prisma.closetItem.deleteMany({
+    where: { closetArchiveId }
+  })
+
+  await prisma.closetArchive.delete({
+    where: { id: closetArchiveId }
+  })
+}
+
+export const publishCloset = async (userId: string, closetArchiveId: string): Promise<void> => {
+  const archive = await prisma.closetArchive.findUnique({
+    where: { id: closetArchiveId },
+    select: {
+      userId: true,
+      post: { select: { id: true } },
+    },
+  });
+
+  if (!archive) {
+    throw new AppError(ErrorCode.CLOSET_NOT_FOUND, '존재하지 않는 옷장입니다.', StatusCodes.NOT_FOUND);
+  }
+
+  if (archive.userId !== userId) {
+    throw new AppError(ErrorCode.NOT_CLOSET_OWNER, '접근 권한이 없습니다.', StatusCodes.FORBIDDEN);
+  }
+
+  if (archive.post) {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, '이미 게시된 코디입니다.', StatusCodes.CONFLICT);
+  }
+
+  await prisma.post.create({
+    data: {
+      userId,
+      closetArchiveId,
+    },
+  });
 };

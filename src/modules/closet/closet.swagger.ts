@@ -73,3 +73,32 @@ registry.registerPath({
     },
   },
 });
+
+registry.registerPath({
+  method: 'delete',
+  path: '/closet/{id}',
+  tags: ['Closet'],
+  summary: '코디 삭제',
+  description: '특정 옷장 아카이브를 삭제합니다. 게시된 게시글도 함께 삭제됩니다.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: ClosetParamsSchema,
+  },
+  responses: {
+    204: {
+      description: '삭제 성공',
+    },
+    401: {
+      description: '인증 필요',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    403: {
+      description: '접근 권한 없음',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    404: {
+      description: '존재하지 않는 옷장',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});

@@ -8,7 +8,7 @@ export const kakaoLoginController = asyncHandler(async (req: Request, res: Respo
 
     const result = await kakaoLogin(accessToken);
 
-    res.status(StatusCodes.OK).json({ data: result });
+    res.status(StatusCodes.OK).json(result);
 })
 
 export const logoutController = asyncHandler(async (req: Request, res: Response) => {
@@ -24,7 +24,7 @@ export const refreshController = asyncHandler(async (req: Request, res: Response
 
   const result = await refresh(refreshToken);
 
-  res.status(StatusCodes.OK).json({ data: result });
+  res.status(StatusCodes.OK).json(result);
 });
 
 export const googleLoginController = asyncHandler(async (req: Request, res: Response) => {
@@ -32,5 +32,5 @@ export const googleLoginController = asyncHandler(async (req: Request, res: Resp
 
     const result = await googleLogin(idToken);
 
-    res.status(StatusCodes.OK).json({ data: result });
+    res.status(StatusCodes.OK).json(result);
 })

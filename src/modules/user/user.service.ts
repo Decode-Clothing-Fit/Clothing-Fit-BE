@@ -1,5 +1,6 @@
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
+import { StatusCodes } from 'http-status-codes';
 import { findUserById, softDeleteUser, deleteAllRefreshToken, 
     findUserProfileById, findPostsByUserId } from './user.repository';
 import { buildPaginationResult } from '@/common/utils/pagination';
@@ -10,7 +11,7 @@ Promise<void> => {
     const user = await findUserById(userId);
 
     if (!user) {
-        throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', 404);
+        throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
     }
 
     await softDeleteUser(userId);
@@ -21,7 +22,7 @@ export const getUserProfile = async (userId: string) => {
     const user = await findUserProfileById(userId);
 
     if(!user) {
-        throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', 404);
+        throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
     }
 
     return {
@@ -41,7 +42,7 @@ export const getUserPosts = async (
   const user = await findUserById(targetUserId);
 
   if (!user) {
-    throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', 404);
+    throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
   }
 
   const posts = await findPostsByUserId(targetUserId, requesterId, query.cursor, query.limit);

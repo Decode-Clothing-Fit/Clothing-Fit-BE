@@ -170,7 +170,13 @@ registry.registerPath({
   responses: {
     200: {
       description: '조회 성공',
-      content: { 'application/json': { schema: getPostsResponseSchema } },
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: getPostsResponseSchema,
+          }),
+        },
+      },
     },
     400: {
       description: '잘못된 요청',
@@ -199,7 +205,13 @@ registry.registerPath({
   responses: {
     200: {
       description: '조회 성공',
-      content: { 'application/json': { schema: getPostsResponseSchema } },
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: getPostsResponseSchema,
+          }),
+        },
+      },
     },
     400: {
       description: '잘못된 요청',
@@ -228,10 +240,49 @@ registry.registerPath({
   responses: {
     200: {
       description: '조회 성공',
-      content: { 'application/json': { schema: getPostsResponseSchema } },
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: getPostsResponseSchema,
+          }),
+        },
+      },
     },
     400: {
       description: '잘못된 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    401: {
+      description: '인증 실패',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});
+
+// 프로필 이미지 변경
+registry.registerPath({
+  method: 'patch',
+  path: '/profile/image',
+  tags: ['Profile'],
+  summary: '프로필 이미지 변경',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: {
+        'multipart/form-data': {
+          schema: z.object({
+            image: z.any().openapi({ type: 'string', format: 'binary' }),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: '이미지 변경 성공',
+    },
+    400: {
+      description: '이미지 파일 없음',
       content: { 'application/json': { schema: ErrorResponseSchema } },
     },
     401: {

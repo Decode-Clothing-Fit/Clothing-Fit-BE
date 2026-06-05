@@ -8,6 +8,9 @@ import { s3Client, S3_BUCKET } from './s3';
 const S3_PUBLIC_PREFIX = `https://${S3_BUCKET}.s3.${env.AWS_REGION}.amazonaws.com/`;
 const MODEL_PREFIX = 'fitting-models/';
 
+// Meshy CDN이 응답하지 않을 때 무한 대기를 막기 위한 glb 다운로드 타임아웃
+const GLB_FETCH_TIMEOUT_MS = 30_000;
+
 /**
  * Meshy가 생성한 glb 모델을 우리 S3에 영속화하고 공개 URL을 반환합니다.
  * Meshy CDN URL은 만료성이므로, 피팅 완료(SUCCEEDED) 직후 저장하는 용도입니다.
@@ -16,7 +19,15 @@ const MODEL_PREFIX = 'fitting-models/';
  * @param sourceUrl  Meshy가 내려준 glb URL
  */
 export const uploadFittingModel = async (userId: string, sourceUrl: string): Promise<string> => {
-    const res = await fetch(sourceUrl);
+    let res: Response;
+    try {
+        res = await fetch(sourceUrl, { signal: AbortSignal.timeout(GLB_FETCH_TIMEOUT_MS) });
+    } catch (err) {
+        if (err instanceof Error && err.name === 'TimeoutError') {
+            throw new Error(`glb 다운로드 타임아웃 (${GLB_FETCH_TIMEOUT_MS}ms 초과)`);
+        }
+        throw err;
+    }
     if (!res.ok || !res.body) {
         throw new Error(`glb 다운로드 실패 (${res.status})`);
     }

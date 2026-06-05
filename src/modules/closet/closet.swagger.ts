@@ -102,3 +102,36 @@ registry.registerPath({
     },
   },
 });
+
+registry.registerPath({
+  method: 'post',
+  path: '/closet/{id}/publish',
+  tags: ['Closet'],
+  summary: '커뮤니티에 게시',
+  description: '옷장 아카이브를 커뮤니티에 게시합니다. 이미 게시된 경우 409를 반환합니다.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: ClosetParamsSchema,
+  },
+  responses: {
+    204: {
+      description: '게시 성공',
+    },
+    401: {
+      description: '인증 필요',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    403: {
+      description: '접근 권한 없음',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    404: {
+      description: '존재하지 않는 옷장',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    409: {
+      description: '이미 게시된 코디',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});

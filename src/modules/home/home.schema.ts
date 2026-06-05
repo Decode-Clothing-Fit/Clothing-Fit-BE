@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 export const popularPostSchema = z.object({
+  postId: z.string().uuid(),
+  userId: z.string().uuid(),
   image: z.string().url(),
   nickname: z.string(),
   createdAt: z.string().datetime(),
@@ -13,6 +15,8 @@ export const popularPostSchema = z.object({
 export const popularPostsResponseSchema = z.array(popularPostSchema).max(10);
 
 export const recommendedInfluencerSchema = z.object({
+  postId: z.string().uuid(),
+  userId: z.string().uuid(),
   postImage: z.string().url().nullable(),
   profileImage: z.string().url().nullable(),
   nickname: z.string(),

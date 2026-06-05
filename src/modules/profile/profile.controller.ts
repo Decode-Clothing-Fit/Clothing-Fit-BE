@@ -2,8 +2,10 @@ import type { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '@/common/utils/async.handler';
 import { getProfile, checkNickname, updateNickname,
-  getBodyInfo, updateBodyInfo, getRecentPosts, getBookmarkedPosts, getLikedPosts } from './profile.service';
+  getBodyInfo, updateBodyInfo, getRecentPosts, getBookmarkedPosts, getLikedPosts, updateProfileImage } from './profile.service';
 import type { CheckNicknameQuery, UpdateNicknameBody, UpdateBodyInfoBody, ProfilePostsQuery } from './profile.schema';
+import { AppError } from '@/common/errors/app-error';
+import { ErrorCode } from '@/common/errors/error-code';
 
 export const getProfileController = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!.id;
@@ -72,4 +74,17 @@ export const getLikedPostsController = asyncHandler(async (req: Request, res: Re
   const result = await getLikedPosts(userId, query);
 
   res.status(StatusCodes.OK).json({ data: result });
+});
+
+export const updateProfileImageController = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const file = req.file;
+
+  if (!file) {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, '이미지 파일이 필요합니다.', StatusCodes.BAD_REQUEST);
+  }
+
+  await updateProfileImage(userId, file);
+
+  res.status(StatusCodes.OK).send();
 });

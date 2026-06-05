@@ -1,6 +1,7 @@
 import { Provider } from '@prisma/client';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
+import { StatusCodes } from 'http-status-codes';
 import { signAccessToken, signRefreshToken } from '@/common/utils/jwt';
 import { createSocialUser, saveRefreshToken,
    findRefreshToken, deleteRefreshToken, restoreSocialUser, 
@@ -18,7 +19,7 @@ const getKakaoUserInfo = async (accessToken: string): Promise<KakaoUserInfo> => 
   });
 
   if (!res.ok) {
-    throw new AppError(ErrorCode.UNAUTHORIZED, '유효하지 않은 카카오 토큰입니다.', 401);
+    throw new AppError(ErrorCode.UNAUTHORIZED, '유효하지 않은 카카오 토큰입니다.', StatusCodes.UNAUTHORIZED);
   }
 
   return res.json() as Promise<KakaoUserInfo>;
@@ -65,7 +66,7 @@ export const logout = async (refreshToken: string): Promise<void> => {
   const token = await findRefreshToken(refreshToken);
 
   if (!token) {
-    throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', 401);
+    throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
   }
 
   await deleteRefreshToken(refreshToken);
@@ -75,12 +76,12 @@ export const refresh = async (refreshToken: string): Promise<{ accessToken: stri
   const token = await findRefreshToken(refreshToken);
 
   if (!token) {
-    throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', 401);
+    throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
   }
 
   if (token.expiresAt < new Date()) {
     await deleteRefreshToken(refreshToken);
-    throw new AppError(ErrorCode.TOKEN_EXPIRED, '리프레시 토큰이 만료되었습니다.', 401);
+    throw new AppError(ErrorCode.TOKEN_EXPIRED, '리프레시 토큰이 만료되었습니다.', StatusCodes.UNAUTHORIZED);
   }
 
   const newAccessToken = signAccessToken({ userId: token.userId });
@@ -100,7 +101,7 @@ Promise<GoogleUserInfo> => {
   const payload = ticket.getPayload();
 
   if (!payload) {
-    throw new AppError(ErrorCode.UNAUTHORIZED, '유효하지 않은 구글 토큰입니다.', 401);
+    throw new AppError(ErrorCode.UNAUTHORIZED, '유효하지 않은 구글 토큰입니다.', StatusCodes.UNAUTHORIZED);
   }
 
   return {

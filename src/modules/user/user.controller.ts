@@ -18,7 +18,7 @@ export const deleteUserController = asyncHandler(async (req: Request, res: Respo
 
    const result = await getUserProfile(id);
 
-   res.status(StatusCodes.OK).json({ data: result });
+   res.status(StatusCodes.OK).json(result);
  })
 
  export const getUserPostsController = asyncHandler(async (req: Request, res: Response) =>
@@ -28,5 +28,5 @@ export const deleteUserController = asyncHandler(async (req: Request, res: Respo
 
    const result = await getUserPosts(id, requesterId, query);
 
-   res.status(StatusCodes.OK).json({ data: result });
+   res.status(StatusCodes.OK).json(result);
 })

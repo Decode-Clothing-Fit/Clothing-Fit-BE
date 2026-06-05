@@ -12,6 +12,11 @@ export const getPostsService = async (query: GetPostsQuery, userId: string) => {
 
   const hasBodyFilter = height !== undefined || weightMin !== undefined || weightMax !== undefined;
 
+  const orderBy =
+    sort === 'LIKE'
+      ? { postLikes: { _count: 'desc' as const } }
+      : { createdAt: sort === 'OLDEST' ? ('asc' as const) : ('desc' as const) };
+
   const results = await prisma.post.findMany({
     where: {
       user: {
@@ -39,7 +44,7 @@ export const getPostsService = async (query: GetPostsQuery, userId: string) => {
         }),
       },
     },
-    orderBy: { createdAt: sort === 'OLDEST' ? 'asc' : 'desc' },
+    orderBy,
     take: limit + 1, // hasMore 판별용
     select: {
       id: true,

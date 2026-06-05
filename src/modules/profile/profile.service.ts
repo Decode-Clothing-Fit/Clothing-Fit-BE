@@ -1,8 +1,14 @@
 import prisma from '@/lib/prisma/extensions';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
+import { StatusCodes } from 'http-status-codes';
 import type { UpdateBodyInfoBody, UpdateNicknameBody,
    updateBodyInfoSchema, ProfilePostsQuery } from './profile.schema';
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { s3Client, S3_BUCKET } from '@/lib/storage/s3';
+import { v4 as uuidv4 } from 'uuid';
+import sharp from 'sharp';
+import { env } from '@/config/env';
 
 
 export const getProfile = async (userId: string) => {
@@ -12,7 +18,7 @@ export const getProfile = async (userId: string) => {
   });
 
   if (!user) {
-    throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', 404);
+    throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
   }
 
   return {
@@ -38,7 +44,7 @@ export const updateNickname = async (userId: string, body: UpdateNicknameBody): 
   });
 
   if (existing) {
-    throw new AppError(ErrorCode.DUPLICATE_NICKNAME, '이미 사용 중인 닉네임입니다.', 409);
+    throw new AppError(ErrorCode.DUPLICATE_NICKNAME, '이미 사용 중인 닉네임입니다.', StatusCodes.CONFLICT);
   }
 
   await prisma.profile.upsert({
@@ -86,7 +92,7 @@ export const getBodyInfo = async (userId: string) => {
 }
 
 export const updateBodyInfo = async (userId: string, body: UpdateBodyInfoBody): Promise<void> => {
-  const { height, weight, chest, waist, hip, shoulder } = body;
+  const { height, weight, chest, waist, hip, shoulder, head, footSize } = body;
 
   const existing = await prisma.bodyInfo.findUnique({
     where: { userId }
@@ -253,4 +259,38 @@ export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) =>
     nextCursor,
     hasMore,
   };
+};
+
+export const updateProfileImage = async (userId: string, file: Express.Multer.File): Promise<void> => {
+  const webpBuffer = await sharp(file.buffer)
+    .resize(400, 400, { fit: 'cover' })
+    .webp({ quality: 80 })
+    .toBuffer();
+
+  const key = `profiles/${userId}/${uuidv4()}.webp`;
+
+  await s3Client.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: key,
+    Body: webpBuffer,
+    ContentType: 'image/webp',
+  }));
+
+  const imageUrl = `https://${S3_BUCKET}.s3.${env.AWS_REGION}.amazonaws.com/${key}`;
+
+  const existing = await prisma.profile.findUnique({ where: { userId } });
+  const oldImageUrl = existing?.imageUrl;
+
+  await prisma.profile.upsert({
+    where: { userId },
+    update: { imageUrl },
+    create: { userId, imageUrl, nickname: `user_${userId}`, gender: 'MALE' },
+  });
+
+  if (oldImageUrl) {
+    const oldKey = oldImageUrl.split('.amazonaws.com/')[1];
+    if (oldKey) {
+      await s3Client.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: oldKey }));
+    }
+  }
 };

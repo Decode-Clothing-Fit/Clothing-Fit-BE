@@ -6,12 +6,9 @@ import { getProfileController, checkNicknameController, updateNicknameController
     updateProfileImageController
  } from './profile.controller'
 import { checkNicknameSchema, updateNicknameSchema, updateBodyInfoSchema, profilePostsQuerySchema } from './profile.schema'
-import multer from 'multer'
+import { singleImageUpload } from '@/common/middleware/upload.middleware';
 
 const router: RouterType = Router();
-const upload = multer({ storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024} // 5MB
-});
 
 // 내 프로필 조회
 router.get('/', authenticate, getProfileController);
@@ -42,7 +39,7 @@ router.get('/bookmarks', authenticate, validate({ query: profilePostsQuerySchema
 // 좋아요한 게시글 목록
 router.get('/interests', authenticate, validate({ query: profilePostsQuerySchema }), getLikedPostsController);
 
-router.patch('/image', authenticate, upload.single('image'), updateProfileImageController)
+router.patch('/image', authenticate, singleImageUpload({ field: 'image' }), updateProfileImageController);
 
 
 export default router;

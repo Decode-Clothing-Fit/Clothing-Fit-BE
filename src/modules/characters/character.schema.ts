@@ -10,16 +10,10 @@ export const CharacterListItemSchema = z
   })
   .openapi('CharacterListItem');
 
-export const GroupedCharactersSchema = z
+export const CharacterListResponseSchema = z
   .object({
     MALE: z.array(CharacterListItemSchema),
     FEMALE: z.array(CharacterListItemSchema),
-  })
-  .openapi('GroupedCharacters');
-
-export const CharacterListResponseSchema = z
-  .object({
-    data: GroupedCharactersSchema,
   })
   .openapi('CharacterListResponse');
 

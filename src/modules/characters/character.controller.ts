@@ -6,8 +6,7 @@ import { getCharacters } from './character.service';
 import type { GroupedCharacters } from './character.service';
 
 export const getCharactersController = asyncHandler(async (_req: Request, res: Response) => {
-  const characters = await getCharacters();
+  const result = await getCharacters();
 
-  const response: ApiResponse<GroupedCharacters> = { data: characters };
-  res.status(StatusCodes.OK).json(response);
+  res.status(StatusCodes.OK).json(result);
 });

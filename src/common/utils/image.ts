@@ -12,6 +12,13 @@ export const ALLOWED_IMAGE_FORMATS: Record<string, string> = {
 
 export type ImageFormat = 'png' | 'jpeg' | 'webp';
 
+/**
+ * 압축 폭탄(decompression bomb) 방어: 디코딩 허용 최대 입력 픽셀 수.
+ * 작은 파일이 거대한 해상도로 풀리며 메모리/CPU를 소진하는 것을 막는다.
+ * 상한 초과 시 sharp가 metadata()/toBuffer() 단계에서 에러를 던진다. (24MP ≈ 6000×4000)
+ */
+const MAX_INPUT_PIXELS = 24_000_000;
+
 export type NormalizedImage = {
     /** 정규화(EXIF 제거·orientation 보정·리사이즈)된 이미지 버퍼 */
     buffer: Buffer;
@@ -37,7 +44,7 @@ export const validateAndNormalizeImage = async (
     options: NormalizeOptions = {},
 ): Promise<NormalizedImage> => {
     const { maxDimension = 1024 } = options;
-    const image = sharp(buffer);
+    const image = sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS });
 
     let format: string | undefined;
     try {

@@ -11,22 +11,16 @@ export const Fitting3DRequestSchema = z
 
 export const Fitting3DStartResponseSchema = z
     .object({
-        message: z.string().openapi({ example: '3D 피팅 생성 시작' }),
-        data: z.object({
-            sessionId: z.string().openapi({ description: '상태 조회에 사용할 세션 ID (24시간 유효)', example: '01968b1c-...' }),
-        }),
+        sessionId: z.string().openapi({ description: '상태 조회에 사용할 세션 ID (24시간 유효)', example: '01968b1c-...' }),
     })
     .openapi('Fitting3DStartResponse');
 
 export const Fitting3DStatusResponseSchema = z
     .object({
-        message: z.string().openapi({ example: '3D 피팅 생성 완료' }),
-        data: z.object({
-            status: z.enum(['QUEUED', 'PROCESSING', 'SUCCEEDED', 'FAILED']).openapi({ example: 'SUCCEEDED' }),
-            progress: z.number().optional().openapi({ example: 80 }),
-            glbUrl: z.string().url().nullable().openapi({ example: 'https://assets.meshy.ai/...glb' }),
-            thumbnailUrl: z.string().url().nullable().openapi({ example: 'https://assets.meshy.ai/...png' }),
-        }),
+        status: z.enum(['QUEUED', 'PROCESSING', 'SUCCEEDED', 'FAILED']).openapi({ example: 'SUCCEEDED' }),
+        progress: z.number().optional().openapi({ example: 80 }),
+        glbUrl: z.string().url().nullable().openapi({ example: 'https://assets.meshy.ai/...glb' }),
+        thumbnailUrl: z.string().url().nullable().openapi({ example: 'https://assets.meshy.ai/...png' }),
     })
     .openapi('Fitting3DStatusResponse');
 
@@ -48,8 +42,8 @@ export const FittingTitleBodySchema = z
     })
     .openapi('FittingTitleBody');
 
-export const FittingTitleResponseSchema = z
+export const UpdateFittingModelResponseSchema = z
     .object({
-        message: z.string().openapi({ example: '제목이 변경되었습니다.' }),
+        modelUrl: z.string().url().openapi({ description: '저장된 3D 모델(.glb) URL', example: 'https://assets.example.com/fitting-models/.../model.glb' }),
     })
-    .openapi('FittingTitleResponse');
+    .openapi('UpdateFittingModelResponse');

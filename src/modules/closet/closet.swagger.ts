@@ -100,6 +100,14 @@ registry.registerPath({
       description: '존재하지 않는 옷장',
       content: { 'application/json': { schema: ErrorResponseSchema } },
     },
+    400: {
+      description: '유효하지 않은 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    500: {
+      description: '서버 내부 오류',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
   },
 });
 
@@ -131,6 +139,14 @@ registry.registerPath({
     },
     409: {
       description: '이미 게시된 코디',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    400: {
+      description: '유효하지 않은 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    500: {
+      description: '서버 내부 오류',
       content: { 'application/json': { schema: ErrorResponseSchema } },
     },
   },

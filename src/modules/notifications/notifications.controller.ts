@@ -8,6 +8,7 @@ import type {
   NotificationIdParam,
   NotificationDto,
 } from './notifications.schema';
+import { StatusCodes } from 'http-status-codes';
 
 // 알림 목록 조회
 export const getNotifications = asyncHandler(async (req: Request, res: Response) => {
@@ -15,7 +16,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
   const query = req.query as unknown as GetNotificationsQuery;
 
   const result = await notificationService.getNotifications(userId, query);
-  res.status(200).json(result);
+  res.status(StatusCodes.OK).json(result);
 });
 
 // 전체 알림 읽음
@@ -23,7 +24,7 @@ export const markAllNotificationsAsRead = asyncHandler(async (req: Request, res:
   const userId = req.user!.id;
 
   await notificationService.markAllAsRead(userId);
-  res.status(204).send();
+  res.status(StatusCodes.NO_CONTENT).send();
 });
 
 // 알림 설정 조회
@@ -31,7 +32,7 @@ export const getNotificationSettings = asyncHandler(async (req: Request, res: Re
   const userId = req.user!.id;
 
   const result = await notificationService.getSettings(userId);
-  res.status(200).json(result);
+  res.status(StatusCodes.OK).json(result);
 });
 
 // 알림 설정 변경
@@ -40,7 +41,7 @@ export const updateNotificationSettings = asyncHandler(async (req: Request, res:
   const body = req.body as unknown as UpdateNotificationSettingsBody;
 
   const result = await notificationService.updateSettings(userId, body);
-  res.status(200).json(result);
+  res.status(StatusCodes.OK).json(result);
 });
 
 // 알림 전체 삭제
@@ -48,7 +49,7 @@ export const deleteAllNotifications = asyncHandler(async (req: Request, res: Res
   const userId = req.user!.id;
 
   await notificationService.deleteAll(userId);
-  res.status(204).send();
+  res.status(StatusCodes.NO_CONTENT).send();
 });
 
 // 알림 개별 삭제
@@ -57,7 +58,7 @@ export const deleteNotification = asyncHandler(async (req: Request, res: Respons
   const { id } = req.params as unknown as NotificationIdParam;
 
   await notificationService.deleteOne(userId, id);
-  res.status(204).send();
+  res.status(StatusCodes.NO_CONTENT).send();
 });
 
 // 알림 SSE 구독
@@ -65,7 +66,7 @@ export const subscribeNotifications = asyncHandler(async (req: Request, res: Res
   const userId = req.user!.id;
 
   // SSE 헤더 설정
-  res.writeHead(200, {
+  res.writeHead(StatusCodes.OK, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',

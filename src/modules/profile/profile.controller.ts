@@ -81,7 +81,7 @@ export const updateProfileImageController = asyncHandler(async (req: Request, re
   const file = req.file;
 
   if (!file) {
-    throw new AppError(ErrorCode.VALIDATION_ERROR, '이미지 파일이 필요합니다.', 400);
+    throw new AppError(ErrorCode.VALIDATION_ERROR, '이미지 파일이 필요합니다.', StatusCodes.BAD_REQUEST);
   }
 
   await updateProfileImage(userId, file);

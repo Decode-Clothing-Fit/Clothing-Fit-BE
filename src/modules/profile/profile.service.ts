@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma/extensions';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
+import { StatusCodes } from 'http-status-codes';
 import type { UpdateBodyInfoBody, UpdateNicknameBody,
    updateBodyInfoSchema, ProfilePostsQuery } from './profile.schema';
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -17,7 +18,7 @@ export const getProfile = async (userId: string) => {
   });
 
   if (!user) {
-    throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', 404);
+    throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
   }
 
   return {
@@ -43,7 +44,7 @@ export const updateNickname = async (userId: string, body: UpdateNicknameBody): 
   });
 
   if (existing) {
-    throw new AppError(ErrorCode.DUPLICATE_NICKNAME, '이미 사용 중인 닉네임입니다.', 409);
+    throw new AppError(ErrorCode.DUPLICATE_NICKNAME, '이미 사용 중인 닉네임입니다.', StatusCodes.CONFLICT);
   }
 
   await prisma.profile.upsert({

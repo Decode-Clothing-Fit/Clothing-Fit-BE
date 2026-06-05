@@ -10,6 +10,8 @@ import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { StatusCodes } from 'http-status-codes';
 import { UserWithProfile } from './follows.types';
+import { Prisma } from '@prisma/client';
+import { createFollowNotification } from '../notifications/notifications.service';
 
 async function ensureUserExists(userId: string): Promise<void> {
   const user = await prisma.user.findFirst({
@@ -101,13 +103,31 @@ export async function followUserService(targetUserId: string, currentUserId: str
   }
   await ensureUserExists(targetUserId);
 
-  await prisma.follow.upsert({
-    where: {
-      followerId_followingId: { followerId: currentUserId, followingId: targetUserId },
-    },
-    create: { followerId: currentUserId, followingId: targetUserId },
-    update: {},
-  });
+  let isNewFollow = false;
+  try {
+    await prisma.follow.create({
+      data: { followerId: currentUserId, followingId: targetUserId },
+    });
+    isNewFollow = true;
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      isNewFollow = false;
+    } else {
+      throw e;
+    }
+  }
+
+  if (isNewFollow) {
+    const actor = await prisma.profile.findUnique({
+      where: { userId: currentUserId },
+      select: { nickname: true },
+    });
+    await createFollowNotification({
+      receiverId: targetUserId,
+      actorId: currentUserId,
+      actorNickname: actor?.nickname ?? '?',
+    });
+  }
 
   const followerCount = await prisma.follow.count({ where: { followingId: targetUserId } });
   return { isFollowing: true, followerCount };

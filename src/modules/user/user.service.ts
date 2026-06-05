@@ -1,51 +1,86 @@
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { StatusCodes } from 'http-status-codes';
-import { findUserById, softDeleteUser, deleteAllRefreshToken, 
-    findUserProfileById, findPostsByUserId } from './user.repository';
+import prisma from '@/lib/prisma/extensions';
 import { buildPaginationResult } from '@/common/utils/pagination';
 import type { GetUserPostsQuery } from './user.schema';
 
-export const deleteUser = async (userId: string):
-Promise<void> => {
-    const user = await findUserById(userId);
+export const deleteUser = async (userId: string): Promise<void> => {
+  const user = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
 
-    if (!user) {
-        throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
-    }
+  if (!user) {
+    throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
+  }
 
-    await softDeleteUser(userId);
-    await deleteAllRefreshToken(userId);
-}
+  await prisma.user.update({ where: { id: userId }, data: { deletedAt: new Date() } });
+  await prisma.refreshToken.deleteMany({ where: { userId } });
+};
 
 export const getUserProfile = async (userId: string) => {
-    const user = await findUserProfileById(userId);
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    include: {
+      profile: true,
+      _count: {
+        select: {
+          posts: true,
+          followers: true,
+          following: true,
+        },
+      },
+    },
+  });
 
-    if(!user) {
-        throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
-    }
+  if (!user) {
+    throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
+  }
 
-    return {
-        nickname: user.profile?.nickname ?? null,
-        imageUrl: user.profile?.imageUrl ?? null,
-        postCount: user._count.posts,
-        followerCount: user._count.followers,
-        followingCount: user._count.following
-    }
-}
+  return {
+    nickname: user.profile?.nickname ?? null,
+    imageUrl: user.profile?.imageUrl ?? null,
+    postCount: user._count.posts,
+    followerCount: user._count.followers,
+    followingCount: user._count.following,
+  };
+};
 
 export const getUserPosts = async (
   targetUserId: string,
   requesterId: string,
   query: GetUserPostsQuery,
 ) => {
-  const user = await findUserById(targetUserId);
+  const user = await prisma.user.findFirst({ where: { id: targetUserId, deletedAt: null } });
 
   if (!user) {
     throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
   }
 
-  const posts = await findPostsByUserId(targetUserId, requesterId, query.cursor, query.limit);
+  const posts = await prisma.post.findMany({
+    where: { userId: targetUserId },
+    orderBy: { createdAt: 'desc' },
+    take: query.limit + 1,
+    select: {
+      id: true,
+      user: {
+        select: {
+          profile: { select: { nickname: true } },
+        },
+      },
+      closetArchive: { select: { imageUrl: true } },
+      _count: { select: { postLikes: true, postBookmarks: true } },
+      postLikes: {
+        where: { userId: requesterId },
+        select: { id: true },
+        take: 1,
+      },
+      postBookmarks: {
+        where: { userId: requesterId },
+        select: { id: true },
+        take: 1,
+      },
+    },
+    ...(query.cursor && { cursor: { id: query.cursor }, skip: 1 }),
+  });
 
   const items = posts.map((post) => ({
     id: post.id,

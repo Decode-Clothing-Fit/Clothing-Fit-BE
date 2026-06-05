@@ -7,7 +7,7 @@ import {
     SessionIdParamSchema,
     FittingTitleParamSchema,
     FittingTitleBodySchema,
-    FittingTitleResponseSchema,
+    UpdateFittingModelResponseSchema,
 } from './fitting.schema';
 
 registry.registerPath({
@@ -65,7 +65,7 @@ registry.registerPath({
 
 registry.registerPath({
     method: 'get',
-    path: '/fitting/{sessionId}',
+    path: '/fitting/3d/{sessionId}',
     tags: ['Fitting'],
     summary: '3D 피팅 상태 조회',
     description:
@@ -120,9 +120,8 @@ registry.registerPath({
         },
     },
     responses: {
-        200: {
-            description: '제목 변경 성공',
-            content: { 'application/json': { schema: FittingTitleResponseSchema } },
+        204: {
+            description: '제목 변경 성공 (본문 없음)',
         },
         400: {
             description: '유효하지 않은 요청 (제목 형식 오류 또는 ID 형식 오류)',
@@ -134,6 +133,43 @@ registry.registerPath({
         },
         404: {
             description: '옷장 아카이브를 찾을 수 없음 (또는 소유자가 아님)',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+    },
+});
+
+registry.registerPath({
+    method: 'post',
+    path: '/fitting/3d/{sessionId}/model',
+    tags: ['Fitting'],
+    summary: '3D 피팅 결과(glb) 저장',
+    description:
+        '완료(SUCCEEDED)된 3D 피팅 결과를 영속화합니다. ' +
+        'Meshy가 생성한 glb를 우리 S3에 업로드하고, 그 링크를 closet_archive.model_url에 저장합니다. ' +
+        '세션 소유자만 호출할 수 있으며, 아직 완료되지 않았으면 409를 반환합니다. (Meshy URL은 만료성이므로 완료 후 24시간 내 저장 권장)',
+    security: [{ bearerAuth: [] }],
+    request: {
+        params: SessionIdParamSchema,
+    },
+    responses: {
+        200: {
+            description: '저장 성공',
+            content: { 'application/json': { schema: UpdateFittingModelResponseSchema } },
+        },
+        401: {
+            description: '인증 필요',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        404: {
+            description: '세션 없음/만료 또는 옷장 아카이브를 찾을 수 없음',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        409: {
+            description: '아직 저장할 수 있는 완료된 결과가 없음',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        502: {
+            description: '3D 결과(glb)를 가져오지 못함 (결과 링크 만료 등)',
             content: { 'application/json': { schema: ErrorResponseSchema } },
         },
     },

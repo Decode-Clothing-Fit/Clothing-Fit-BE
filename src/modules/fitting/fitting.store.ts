@@ -4,6 +4,7 @@ export type FittingStatus = 'QUEUED' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 
 export type FittingSession = {
     userId: string;
+    closetArchiveId: string;
     meshTaskId?: string;
     imageUrl: string;
     status: FittingStatus;

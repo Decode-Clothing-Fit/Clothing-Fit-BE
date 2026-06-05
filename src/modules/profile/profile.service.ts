@@ -273,19 +273,21 @@ export const updateProfileImage = async (userId: string, file: Express.Multer.Fi
     ContentType: 'image/webp',
   }));
 
-  const imageUrl = `https://${S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+  const imageUrl = `https://${S3_BUCKET}.s3.${env.AWS_REGION}.amazonaws.com/${key}`;
 
   const existing = await prisma.profile.findUnique({ where: { userId } });
-  if (existing?.imageUrl) {
-    const oldKey = existing.imageUrl.split('.amazonaws.com/')[1];
-    if (oldKey) {
-      await s3Client.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: oldKey }));
-    }
-  }
+  const oldImageUrl = existing?.imageUrl;
 
   await prisma.profile.upsert({
     where: { userId },
     update: { imageUrl },
     create: { userId, imageUrl, nickname: `user_${userId}`, gender: 'MALE' },
   });
+
+  if (oldImageUrl) {
+    const oldKey = oldImageUrl.split('.amazonaws.com/')[1];
+    if (oldKey) {
+      await s3Client.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: oldKey }));
+    }
+  }
 };

@@ -170,7 +170,13 @@ registry.registerPath({
   responses: {
     200: {
       description: '조회 성공',
-      content: { 'application/json': { schema: getPostsResponseSchema } },
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: getPostsResponseSchema,
+          }),
+        },
+      },
     },
     400: {
       description: '잘못된 요청',
@@ -199,7 +205,13 @@ registry.registerPath({
   responses: {
     200: {
       description: '조회 성공',
-      content: { 'application/json': { schema: getPostsResponseSchema } },
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: getPostsResponseSchema,
+          }),
+        },
+      },
     },
     400: {
       description: '잘못된 요청',
@@ -228,7 +240,13 @@ registry.registerPath({
   responses: {
     200: {
       description: '조회 성공',
-      content: { 'application/json': { schema: getPostsResponseSchema } },
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: getPostsResponseSchema,
+          }),
+        },
+      },
     },
     400: {
       description: '잘못된 요청',

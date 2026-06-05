@@ -9,7 +9,9 @@ import { checkNicknameSchema, updateNicknameSchema, updateBodyInfoSchema, profil
 import multer from 'multer'
 
 const router: RouterType = Router();
-const upload = multer({ storage: multer.memoryStorage()});
+const upload = multer({ storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024} // 5MB
+});
 
 // 내 프로필 조회
 router.get('/', authenticate, getProfileController);

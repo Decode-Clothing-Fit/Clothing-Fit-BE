@@ -5,7 +5,7 @@ import { z } from 'zod';
 export const getPostsQuerySchema = z.object({
   follow: z.enum(['TRUE', 'FALSE']).transform((v) => v === "TRUE").optional(),
   gender: z.nativeEnum(Gender).optional(),
-  sort: z.enum(['LATEST', 'OLDEST']).default('LATEST'),
+  sort: z.enum(['LATEST', 'OLDEST', 'LIKE']).default('LATEST'),
   keyword: z.string().trim().max(100).optional(),
   height: z.coerce.number().int().min(0).max(300).optional(),
   weightMin: z.coerce.number().int().min(0).max(500).optional(),

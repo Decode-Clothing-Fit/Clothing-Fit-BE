@@ -5,9 +5,7 @@ extendZodWithOpenApi(z);
 
 export const UserAvatarResponseSchema = z
     .object({
-        data: z.object({
-            imageUrl: z.string().url().openapi({ description: '아바타 이미지 URL', example: 'https://assets.example.com/avatar.png' }),
-        }),
+        imageUrl: z.string().url().openapi({ description: '아바타 이미지 URL', example: 'https://assets.example.com/avatar.png' }),
     })
     .openapi('UserAvatarResponse');
 

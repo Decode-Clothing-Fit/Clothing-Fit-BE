@@ -1,12 +1,9 @@
 import { type Router as RouterType, Router } from 'express';
-import { authenticate } from '@/common/middleware/auth.middleware';
-import { validate } from '@/common/middleware/validate.middleware';
-import { getCharactersController, selectCharacterController } from './character.controller';
-import { SelectCharacterBodySchema } from './character.schema';
+import { getCharactersController } from './character.controller';
 
 const router: RouterType = Router();
 
+// 신체 타입 별 캐릭터 목록 조회 (선택 가능한 프리셋 카탈로그)
 router.get('/', getCharactersController);
-router.post('/me', authenticate, validate({ body: SelectCharacterBodySchema }), selectCharacterController);
 
 export default router;

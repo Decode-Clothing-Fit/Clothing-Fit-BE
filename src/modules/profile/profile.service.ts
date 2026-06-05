@@ -92,7 +92,7 @@ export const getBodyInfo = async (userId: string) => {
 }
 
 export const updateBodyInfo = async (userId: string, body: UpdateBodyInfoBody): Promise<void> => {
-  const { height, weight, chest, waist, hip, shoulder, head, footSize } = body;
+  const { height, weight, chest, waist, hip, shoulder } = body;
 
   const existing = await prisma.bodyInfo.findUnique({
     where: { userId }
@@ -123,6 +123,7 @@ export const updateBodyInfo = async (userId: string, body: UpdateBodyInfoBody): 
   })
 }
 
+// 최근 조회한 커뮤니티 목록
 export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) => {
   const { cursor, limit } = query;
 
@@ -168,6 +169,7 @@ export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) =
   };
 };
 
+// 북마크한 코디 목록
 export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuery) => {
   const { cursor, limit } = query;
 
@@ -213,6 +215,7 @@ export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuer
   };
 };
 
+// 좋아요한 게시글 목록
 export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) => {
   const { cursor, limit } = query;
 

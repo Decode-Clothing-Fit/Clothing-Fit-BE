@@ -16,6 +16,7 @@ export const getPopularPostsService = async (
       { createdAt: 'desc' },
     ],
     select: {
+      id: true,
       createdAt: true,
       closetArchive: {
         select: {
@@ -28,6 +29,7 @@ export const getPopularPostsService = async (
       },
       user: {
         select: {
+          id: true,
           profile: { select: { nickname: true } },
         },
       },
@@ -40,6 +42,8 @@ export const getPopularPostsService = async (
   });
 
   return posts.map((post) => ({
+    postId: post.id,
+    userId: post.user.id,
     image: post.closetArchive.imageUrl,
     nickname: post.user.profile?.nickname ?? '',
     createdAt: post.createdAt.toISOString(),
@@ -89,6 +93,7 @@ export const getRecommendedInfluencersService = async (
         ],
         take: 1,
         select: {
+          id: true,
           closetArchive: { select: { imageUrl: true } },
         },
       },
@@ -106,6 +111,8 @@ export const getRecommendedInfluencersService = async (
   );
 
   return sorted.slice(0, 10).map((user) => ({
+    userId: user.id,
+    postId: user.posts[0].id,
     postImage: user.posts[0].closetArchive.imageUrl,
     profileImage: user.profile?.imageUrl ?? null,
     nickname: user.profile?.nickname ?? '',

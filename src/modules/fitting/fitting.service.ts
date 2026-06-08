@@ -7,6 +7,7 @@ import { ErrorCode } from '@/common/errors/error-code';
 import prisma from '@/lib/prisma/extensions';
 import { uploadFittingModel, deleteFittingModel } from '@/lib/storage/fitting-model';
 import { fittingStore, type FittingSession } from './fitting.store';
+import { createFitCompleteNotification } from '../notifications/notifications.service';
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 const POLL_INTERVAL_MS = 5000;
@@ -205,6 +206,12 @@ async function pollMeshStatus(sessionId: string): Promise<void> {
             session.thumbnailUrl = meshData.thumbnail_url;
             fittingStore.setSession(sessionId, session);
             releaseSlot(sessionId);
+
+            createFitCompleteNotification({
+                receiverId: session.userId,
+                dimension: '3D',
+                closetArchiveId: session.closetArchiveId
+            })
         } else if (meshData.status === 'FAILED' || meshData.status === 'EXPIRED') {
             session.status = 'FAILED';
             fittingStore.setSession(sessionId, session);

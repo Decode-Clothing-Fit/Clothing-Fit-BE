@@ -26,6 +26,7 @@ model User {
   followers            Follow[]             @relation("Following")
   following            Follow[]             @relation("Follower")
   receivedNotifications Notification[]      @relation("ReceivedNotifications")
+  actedNotifications Notification[] @relation("ActedNotifications")
   notificationSettings NotificationSetting?
 
   @@map("users")
@@ -196,15 +197,16 @@ model Follow {
 
 model Notification {
   id         String                  @id @db.Uuid @default(uuid())
+  actorId    String?                 @map("actor_id") @db.Uuid
   receiverId String                  @map("receiver_id") @db.Uuid
   type       NotificationType
   message    String
-  targetType NotificationTargetType? @map("target_type")
   targetId   String?                 @map("target_id") @db.Uuid
   isRead     Boolean                 @default(false) @map("is_read")
   createdAt  DateTime                @default(now()) @map("created_at")
 
   receiver User  @relation("ReceivedNotifications", fields: [receiverId], references: [id])
+  actor    User? @relation("ActedNotifications", fields: [actorId], references: [id])
 
   @@map("notifications")
 }
@@ -268,9 +270,4 @@ enum NotificationType {
   LIKE
   FOLLOW
   FEED_FROM_FOLLOWING
-}
-
-enum NotificationTargetType {
-  POST
-  USER
 }

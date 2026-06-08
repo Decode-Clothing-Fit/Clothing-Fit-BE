@@ -16,6 +16,7 @@ followsRegistry.registerPath({
   tags: ['Follows'],
   summary: '팔로워 목록 조회',
   description: '특정 유저를 팔로우하는 사람들의 목록을 커서 페이지네이션으로 조회합니다.',
+  security: [{ bearerAuth: [] }],
   request: {
     params: FollowParamsSchema,
     query: FollowsPaginationQuerySchema,
@@ -63,6 +64,7 @@ followsRegistry.registerPath({
   tags: ['Follows'],
   summary: '팔로잉 목록 조회',
   description: '특정 유저가 팔로우하는 사람들의 목록을 커서 페이지네이션으로 조회합니다.',
+  security: [{ bearerAuth: [] }],
   request: {
     params: FollowParamsSchema,
     query: FollowsPaginationQuerySchema,
@@ -110,6 +112,7 @@ followsRegistry.registerPath({
   tags: ['Follows'],
   summary: '팔로우',
   description: '특정 유저를 팔로우합니다. 이미 팔로우 중이어도 멱등하게 처리됩니다.',
+  security: [{ bearerAuth: [] }],
   request: {
     params: FollowParamsSchema,
   },
@@ -148,6 +151,7 @@ followsRegistry.registerPath({
   tags: ['Follows'],
   summary: '언팔로우',
   description: '특정 유저에 대한 팔로우를 취소합니다. 팔로우 상태가 아니어도 멱등하게 처리됩니다.',
+  security: [{ bearerAuth: [] }],
   request: {
     params: FollowParamsSchema,
   },

@@ -157,6 +157,7 @@ export const getPostByIdService = async (id: string, userId: string) => {
     id: post.id,
     createdAt: post.createdAt,
     user: {
+      id: post.user.id,
       nickname: post.user.profile?.nickname ?? null,
       imageUrl: post.user.profile?.imageUrl ?? null,
       height: bodyInfo?.height ?? null,

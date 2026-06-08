@@ -69,13 +69,6 @@ registry.registerPath({
   responses: {
     200: {
       description: '닉네임 변경 성공',
-      content: {
-        'application/json': {
-          schema: z.object({
-            message: z.string().openapi({ example: '닉네임 변경 성공' }),
-          }),
-        },
-      },
     },
     401: {
       description: '인증 실패',
@@ -135,13 +128,6 @@ registry.registerPath({
   responses: {
     200: {
       description: '체형 정보 수정 성공',
-      content: {
-        'application/json': {
-          schema: z.object({
-            message: z.string().openapi({ example: '체형 정보 수정 성공' }),
-          }),
-        },
-      },
     },
     400: {
       description: '잘못된 요청',

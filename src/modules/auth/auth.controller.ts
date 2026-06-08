@@ -4,11 +4,11 @@ import { asyncHandler } from '@/common/utils/async.handler';
 import { kakaoLogin,logout, refresh, googleLogin } from './auth.service';
 
 export const kakaoLoginController = asyncHandler(async (req: Request, res: Response) => {
-    const { accessToken } = req.body;
+  const { accessToken } = req.body;
 
-    const result = await kakaoLogin(accessToken);
+  const result = await kakaoLogin(accessToken);
 
-    res.status(StatusCodes.OK).json(result);
+  res.status(StatusCodes.OK).json(result);
 })
 
 export const logoutController = asyncHandler(async (req: Request, res: Response) => {
@@ -28,9 +28,9 @@ export const refreshController = asyncHandler(async (req: Request, res: Response
 });
 
 export const googleLoginController = asyncHandler(async (req: Request, res: Response) => {
-    const { idToken } = req.body;
+  const { idToken } = req.body;
 
-    const result = await googleLogin(idToken);
+  const result = await googleLogin(idToken);
 
-    res.status(StatusCodes.OK).json(result);
+  res.status(StatusCodes.OK).json(result);
 })

@@ -2,8 +2,7 @@ import prisma from '@/lib/prisma/extensions';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { StatusCodes } from 'http-status-codes';
-import type { UpdateBodyInfoBody, UpdateNicknameBody,
-   updateBodyInfoSchema, ProfilePostsQuery } from './profile.schema';
+import type { UpdateBodyInfoBody, UpdateNicknameBody, ProfilePostsQuery } from './profile.schema';
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client, S3_BUCKET } from '@/lib/storage/s3';
 import { v4 as uuidv4 } from 'uuid';

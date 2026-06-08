@@ -8,19 +8,19 @@
 
 | 영역            | 기술                         |
 | --------------- | ---------------------------- |
-| Package Manager | pnpm                         |
-| Runtime         | Node.js                      |
-| Language        | TypeScript                   |
-| Framework       | Express                      |
-| Database        | PostgreSQL                   |
-| ORM             | Prisma                       |
-| Authentication  | JWT + Refresh Token          |
-| Security & Traffic | Rate Limiting             |
-| Validation      | Zod                          |
-| API Docs        | Swagger (zod-to-openapi)     |
-| Environment     | dotenv                       |
-| Code Quality    | biome                        |
-| Deployment      | AWS s3, AWS EC2, AWS RDS     |
+| Package Manager | ![pnpm](https://img.shields.io/badge/pnpm-F69220?style=flat-square&logo=pnpm&logoColor=white) |
+| Runtime         | ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white) |
+| Language        | ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) |
+| Framework       | ![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white) |
+| Database        | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white) |
+| ORM             | ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) |
+| Authentication  | ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) |
+| Security & Traffic | ![Rate Limiting](https://img.shields.io/badge/Rate--Limiting-FF6B6B?style=flat-square&logo=shield&logoColor=white) |
+| Validation      | ![Zod](https://img.shields.io/badge/Zod-3E67B1?style=flat-square&logo=zod&logoColor=white) |
+| API Docs        | ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat-square&logo=swagger&logoColor=black) |
+| Environment     | ![dotenv](https://img.shields.io/badge/dotenv-ECD53F?style=flat-square&logo=dotenv&logoColor=black) |
+| Code Quality    | ![Biome](https://img.shields.io/badge/Biome-60A5FA?style=flat-square&logo=biome&logoColor=white) |
+| Deployment      | ![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?style=flat-square&logo=amazons3&logoColor=white) ![AWS EC2](https://img.shields.io/badge/AWS_EC2-FF9900?style=flat-square&logo=amazonec2&logoColor=white) ![AWS RDS](https://img.shields.io/badge/AWS_RDS-527FFF?style=flat-square&logo=amazonrds&logoColor=white) |
 
 ## 📂 Backend 폴더 구조 (Folder Structure)
 
@@ -36,13 +36,15 @@ src/
 ├── common/             # 전역 공통 로직
 │   ├── errors/         # 커스텀 에러 및 에러 처리
 │   ├── middleware/     # Express 미들웨어
+│   ├── schemas/        # 공통 스키마
 │   ├── types/          # 공통 타입 선언
 │   └── utils/          # 유틸 함수
 │
 ├── config/             # 환경 및 설정 파일
 │
-├── lib/     # 외부 시스템 연결 계층
-│   ├── logger/         # Winston 등 로깅
+├── lib/                # 외부 시스템 연결 계층
+│   ├── ai/             # AI 클라이언트 (Gemini, Meshy)
+│   ├── logger/         # 로깅
 │   ├── prisma/         # Prisma 클라이언트
 │   └── storage/        # 파일 저장소
 │
@@ -79,7 +81,7 @@ tests/                  # 테스트
 2. 설명
 3. 설명
 예시)
-WAL-01 feat : 로그인 기능
+SCRUM-01 feat : 로그인 기능
 1. 로그인 api 연결
 2. 로그인 버튼 생성
 3. 로그인 연결
@@ -96,7 +98,7 @@ feat/health-check
 ```text
 지라티켓키 타입 : 설명
 예시)
-WAL-01 : 로그인 기능 구현
+SCRUM-01 feat : 로그인 기능 구현
 ```
 
 ---
@@ -128,6 +130,8 @@ pnpm install
 ```bash
 pnpm dev        # 개발 모드 실행
 
+pnpm build      # 프로덕션 빌드
+
 pnpm start      # 프로덕션 실행
 ```
 
@@ -138,5 +142,5 @@ pnpm start      # 프로덕션 실행
 | 프로필                                                         | 이름   | 역할      | GitHub                                             |
 | ------------------------------------------------------------- | ------ | --------- | -------------------------------------------------- |
 | <img src="https://github.com/hollyjelly.png" width="50" />    | 나현지 | Fitting / Closet | [@hollyjelly](https://github.com/hollyjelly)  |
-| <img src="https://github.com/doeun9903.png" width="50" />     | 박도은 | Auth / Items / Users | [@doeun9903](http://github.com/doeun9903) |
+| <img src="https://github.com/doeun9903.png" width="50" />     | 박도은 | Auth / Profile / Users | [@doeun9903](http://github.com/doeun9903) |
 | <img src="https://github.com/s576air.png" width="50" />       | 한재민 | Notifications / Posts | [@s576air](https://github.com/s576air)   |

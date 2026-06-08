@@ -182,30 +182,41 @@ const createNotification = async (
       where: { id: created.targetId },
       select: {
         id: true,
-        postImages: { orderBy: { order: 'asc' }, take: 1, select: { imageUrl: true } },
+        closetArchive: { select: { imageUrl: true } },
       },
     });
-    post = p ? { id: p.id, image: p.postImages[0]?.imageUrl ?? null } : null;
+    post = p ? { id: p.id, image: p.closetArchive.imageUrl } : null;
   }
 
   notificationEmitter.emit(userChannel(input.receiverId), toNotificationDto(created, { post })); // SSE 팬아웃
 };
 
 // 좋아요 알림
-export const createLikeNotification = (params: {
-  receiverId: string;
+export const createLikeNotification = async (params: {
   actorId: string;
-  actorNickname: string;
   postId: string;
-}) =>
-  createNotification({
-    receiverId: params.receiverId,
+}) => {
+  const [post, actorProfile] = await Promise.all([
+    prisma.post.findUnique({
+      where: { id: params.postId },
+      select: { userId: true },
+    }),
+    prisma.profile.findUnique({
+      where: { userId: params.actorId },
+      select: { nickname: true },
+    }),
+  ]);
+
+  if (!post || !actorProfile || post.userId === params.actorId) return;
+
+  return createNotification({
+    receiverId: post.userId,
     type: NotificationType.LIKE,
-    message: `${params.actorNickname}님이 회원님의 게시물을 좋아합니다.`,
+    message: `${actorProfile.nickname}님이 회원님의 게시물을 좋아합니다.`,
     actorId: params.actorId,
-    targetType: 'POST',
     targetId: params.postId,
   });
+};
 
 // 팔로우 알림
 export const createFollowNotification = (params: {
@@ -218,25 +229,90 @@ export const createFollowNotification = (params: {
     type: NotificationType.FOLLOW,
     message: `${params.actorNickname}님이 회원님을 팔로우하기 시작했습니다.`,
     actorId: params.actorId,
-    targetType: 'USER',
     targetId: params.actorId,
   });
 
-// 팔로잉 피드 알림
-export const createFeedNotification = (params: {
-  receiverId: string;
+// post 획득
+const getNotificationPost = async (
+  postId: string,
+): Promise<{ id: string; image: string | null } | null> => {
+  const p = await prisma.post.findUnique({
+    where: { id: postId },
+    select: {
+      id: true,
+      closetArchive: { select: { imageUrl: true } },
+    },
+  });
+  return p ? { id: p.id, image: p.closetArchive.imageUrl } : null;
+};
+
+// 다수에게 알림
+const createFanoutNotification = async (input: {
+  receiverIds: string[];
+  type: NotificationType;
+  message: string;
   actorId: string;
-  actorNickname: string;
+  targetId: string;
+}): Promise<void> => {
+  if (input.receiverIds.length === 0) return;
+
+  // 공통 데이터 조회
+  const [post, pushDisabledSettings] = await Promise.all([
+    input.type === NotificationType.FEED_FROM_FOLLOWING ? getNotificationPost(input.targetId) : null,
+    prisma.notificationSetting.findMany({
+      where: { userId: { in: input.receiverIds }, pushEnabled: false },
+      select: { userId: true },
+    }),
+  ]);
+
+  const created = await prisma.notification.createManyAndReturn({
+    data: input.receiverIds.map((receiverId) => ({
+      receiverId,
+      type: input.type,
+      message: input.message,
+      actorId: input.actorId,
+      targetId: input.targetId,
+    })),
+    include: {
+      actor: { select: { id: true, profile: { select: { nickname: true } } } },
+    },
+  });
+
+  // push 꺼진 수신자는 SSE 제외
+  const pushDisabled = new Set(pushDisabledSettings.map((s) => s.userId));
+
+  for (const n of created) {
+    if (pushDisabled.has(n.receiverId)) continue;
+    notificationEmitter.emit(userChannel(n.receiverId), toNotificationDto(n, { post }));
+  }
+};
+
+// 팔로잉 피드 알림
+export const createFeedNotification = async (params: {
+  actorId: string;
   postId: string;
-}) =>
-  createNotification({
-    receiverId: params.receiverId,
+}) => {
+  const [actorProfile, followers] = await Promise.all([
+    prisma.profile.findUnique({
+      where: { userId: params.actorId },
+      select: { nickname: true },
+    }),
+    prisma.follow.findMany({
+      where: { followingId: params.actorId },
+      select: { followerId: true },
+    }),
+  ]);
+
+  if (!actorProfile || followers.length === 0) return;
+
+  await createFanoutNotification({
+    receiverIds: followers.map((f) => f.followerId),
     type: NotificationType.FEED_FROM_FOLLOWING,
-    message: `${params.actorNickname}님이 새 게시물을 올렸습니다.`,
+    message: `${actorProfile.nickname}님이 새 게시물을 올렸습니다.`,
     actorId: params.actorId,
-    targetType: 'POST',
     targetId: params.postId,
   });
+};
 
 // 모델 완료 알림
 export const createFitCompleteNotification = (params: {
@@ -251,6 +327,5 @@ export const createFitCompleteNotification = (params: {
         ? NotificationType.FIT_2D_COMPLETE
         : NotificationType.FIT_3D_COMPLETE,
     message: `${params.dimension} 피팅 모델이 완성되었습니다.`,
-    targetType: 'CLOSET_ARCHIVE',
     targetId: params.closetArchiveId,
   });

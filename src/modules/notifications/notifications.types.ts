@@ -5,7 +5,6 @@ export type CreateNotificationInput = {
   type: NotificationType;
   message: string;
   actorId?: string | null;
-  targetType?: string | null;
   targetId?: string | null;
 };
 

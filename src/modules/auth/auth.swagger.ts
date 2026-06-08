@@ -2,6 +2,11 @@ import { registry } from '@/config/registry';
 import { z } from 'zod';
 import { ErrorResponseSchema } from '@/common/schemas/api.schema';
 
+const TooManyRequestsResponse = {
+  description: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.',
+  content: { 'application/json': { schema: ErrorResponseSchema } },
+};
+
 const SocialLoginResponseSchema = z
   .object({
     accessToken: z.string().openapi({ example: 'eyJhbGci...' }),
@@ -41,6 +46,7 @@ registry.registerPath({
       description: '유효하지 않은 카카오 토큰',
       content: { 'application/json': { schema: ErrorResponseSchema } },
     },
+    429: TooManyRequestsResponse,
   },
 });
 
@@ -69,6 +75,7 @@ registry.registerPath({
       description: '유효하지 않은 구글 토큰',
       content: { 'application/json': { schema: ErrorResponseSchema } },
     },
+    429: TooManyRequestsResponse,
   },
 });
 
@@ -96,6 +103,7 @@ registry.registerPath({
       description: '유효하지 않은 토큰',
       content: { 'application/json': { schema: ErrorResponseSchema } },
     },
+    429: TooManyRequestsResponse,
   },
 });
 
@@ -124,5 +132,6 @@ registry.registerPath({
       description: '유효하지 않은 토큰',
       content: { 'application/json': { schema: ErrorResponseSchema } },
     },
+    429: TooManyRequestsResponse,
   },
 });

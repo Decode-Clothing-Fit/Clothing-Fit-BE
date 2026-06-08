@@ -14,8 +14,9 @@ export const deleteUserController = asyncHandler(async (req: Request, res: Respo
 
 export const getUserProfileController = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
+  const requesterId = req.user!.id;
 
-  const result = await getUserProfile(id);
+  const result = await getUserProfile(id, requesterId);
 
   res.status(StatusCodes.OK).json(result);
 });

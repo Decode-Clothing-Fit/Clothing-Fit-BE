@@ -7,6 +7,7 @@ export const UserProfileResponseSchema = z.object({
   postCount: z.number(),
   followerCount: z.number(),
   followingCount: z.number(),
+  isFollowing: z.boolean(),
 }).openapi('UserProfileResponse');
 
 export const getUserPostsQuerySchema = z.object({

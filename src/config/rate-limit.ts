@@ -1,4 +1,5 @@
 import rateLimit from 'express-rate-limit';
+import { StatusCodes } from 'http-status-codes';
 import { AppError } from '../common/errors/app-error';
 import { ErrorCode } from '../common/errors/error-code';
 
@@ -8,7 +9,7 @@ export const defaultRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, _res, next) => {
-    next(new AppError(ErrorCode.TOO_MANY_REQUESTS, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429));
+    next(new AppError(ErrorCode.TOO_MANY_REQUESTS, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', StatusCodes.TOO_MANY_REQUESTS));
   },
 });
 
@@ -18,7 +19,7 @@ export const authRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, _res, next) => {
-    next(new AppError(ErrorCode.TOO_MANY_REQUESTS, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429));
+    next(new AppError(ErrorCode.TOO_MANY_REQUESTS, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', StatusCodes.TOO_MANY_REQUESTS));
   },
 });
 
@@ -28,6 +29,6 @@ export const fittingRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, _res, next) => {
-    next(new AppError(ErrorCode.TOO_MANY_REQUESTS, '피팅 요청 한도를 초과했습니다.', 429));
+    next(new AppError(ErrorCode.TOO_MANY_REQUESTS, '피팅 요청 한도를 초과했습니다.', StatusCodes.TOO_MANY_REQUESTS));
   },
 });

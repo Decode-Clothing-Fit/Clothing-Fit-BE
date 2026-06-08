@@ -15,21 +15,21 @@ import { authenticate } from '@/common/middleware/auth.middleware';
 const router: RouterType = Router();
 
 // 게시글 목록 조회 (필터/정렬/검색 포함)
-router.get('/', validate({ query: getPostsQuerySchema }), authenticate, asyncHandler(getPosts));
+router.get('/', validate({ query: getPostsQuerySchema }), authenticate, getPosts);
 
 // 게시글 상세 조회
-router.get('/:id', validate({ params: postIdParamSchema }), authenticate, asyncHandler(getPostById));
+router.get('/:id', validate({ params: postIdParamSchema }), authenticate, getPostById);
 
 // 좋아요
-router.post('/:id/like', validate({ params: postIdParamSchema }), authenticate, asyncHandler(likePost));
+router.post('/:id/like', validate({ params: postIdParamSchema }), authenticate, likePost);
 
 // 좋아요 취소
-router.delete('/:id/like', validate({ params: postIdParamSchema }), authenticate, asyncHandler(unlikePost));
+router.delete('/:id/like', validate({ params: postIdParamSchema }), authenticate, unlikePost);
 
 // 북마크
-router.post('/:id/bookmark', validate({ params: postIdParamSchema }), authenticate, asyncHandler(bookmarkPost));
+router.post('/:id/bookmark', validate({ params: postIdParamSchema }), authenticate, bookmarkPost);
 
 // 북마크 취소
-router.delete('/:id/bookmark', validate({ params: postIdParamSchema }), authenticate, asyncHandler(unbookmarkPost));
+router.delete('/:id/bookmark', validate({ params: postIdParamSchema }), authenticate, unbookmarkPost);
 
 export default router;

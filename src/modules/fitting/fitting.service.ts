@@ -1,4 +1,3 @@
-import sharp from 'sharp';
 import { uuidv7 } from 'uuidv7';
 import { Prisma, type ClothingType } from '@prisma/client';
 import { StatusCodes } from 'http-status-codes';
@@ -12,6 +11,7 @@ import { uploadClosetImage, deleteClosetImage } from '@/lib/storage/closet-image
 import { fittingStore, type FittingSession } from './fitting.store';
 import type { CoordiMeasurements } from './fitting.schema';
 import { CATEGORY_LABEL, buildCoordiPrompt, parseOutfitName } from './fitting.prompt';
+import { createFitCompleteNotification } from '../notifications/notifications.service';
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 const POLL_INTERVAL_MS = 5000;
@@ -210,6 +210,12 @@ async function pollMeshStatus(sessionId: string): Promise<void> {
             session.thumbnailUrl = meshData.thumbnail_url;
             fittingStore.setSession(sessionId, session);
             releaseSlot(sessionId);
+
+            createFitCompleteNotification({
+                receiverId: session.userId,
+                dimension: '3D',
+                closetArchiveId: session.closetArchiveId
+            })
         } else if (meshData.status === 'FAILED' || meshData.status === 'EXPIRED') {
             session.status = 'FAILED';
             fittingStore.setSession(sessionId, session);

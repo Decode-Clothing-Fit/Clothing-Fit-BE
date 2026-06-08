@@ -5,6 +5,7 @@ import type { CursorPaginationParams, CursorPaginationResult } from '@/common/ut
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { StatusCodes } from 'http-status-codes';
+import { createFeedNotification } from '../notifications/notifications.service';
 
 export type ClosetItemSummary = {
   id: string;
@@ -180,10 +181,13 @@ export const publishCloset = async (userId: string, closetArchiveId: string): Pr
     throw new AppError(ErrorCode.VALIDATION_ERROR, '이미 게시된 코디입니다.', StatusCodes.CONFLICT);
   }
 
-  await prisma.post.create({
+  const post = await prisma.post.create({
     data: {
       userId,
       closetArchiveId,
     },
+    select: { id: true },
   });
+
+  createFeedNotification({ actorId: userId, postId: post.id })
 };

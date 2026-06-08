@@ -5,6 +5,7 @@ import type { GetPostsQuery } from './posts.schema';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { StatusCodes } from 'http-status-codes';
+import { createLikeNotification } from '../notifications/notifications.service';
 
 // 게시글 목록 조회 (필터/정렬/검색)
 export const getPostsService = async (query: GetPostsQuery, userId: string) => {
@@ -157,6 +158,7 @@ export const getPostByIdService = async (id: string, userId: string) => {
     id: post.id,
     createdAt: post.createdAt,
     user: {
+      id: post.user.id,
       nickname: post.user.profile?.nickname ?? null,
       imageUrl: post.user.profile?.imageUrl ?? null,
       height: bodyInfo?.height ?? null,
@@ -199,6 +201,11 @@ export const likePostService = async (userId: string, postId: string) => {
       where: { postId },
     }),
   ]);
+
+  createLikeNotification({
+    actorId: userId,
+    postId,
+  });
 
   return { liked: true, likeCount };
 };

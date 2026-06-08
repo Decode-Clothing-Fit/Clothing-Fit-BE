@@ -16,20 +16,25 @@ export const deleteUser = async (userId: string): Promise<void> => {
   await prisma.refreshToken.deleteMany({ where: { userId } });
 };
 
-export const getUserProfile = async (userId: string) => {
-  const user = await prisma.user.findFirst({
-    where: { id: userId, deletedAt: null },
-    include: {
-      profile: true,
-      _count: {
-        select: {
-          posts: true,
-          followers: true,
-          following: true,
+export const getUserProfile = async (userId: string, requesterId: string) => {
+  const [user, follow] = await Promise.all([
+    prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      include: {
+        profile: true,
+        _count: {
+          select: {
+            posts: true,
+            followers: true,
+            following: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.follow.findUnique({
+      where: { followerId_followingId: { followerId: requesterId, followingId: userId } },
+    }),
+  ]);
 
   if (!user) {
     throw new AppError(ErrorCode.USER_NOT_FOUND, '존재하지 않는 유저입니다.', StatusCodes.NOT_FOUND);
@@ -41,6 +46,7 @@ export const getUserProfile = async (userId: string) => {
     postCount: user._count.posts,
     followerCount: user._count.followers,
     followingCount: user._count.following,
+    isFollowing: follow !== null,
   };
 };
 

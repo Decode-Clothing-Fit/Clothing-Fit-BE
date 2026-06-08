@@ -1,12 +1,17 @@
+import sharp from 'sharp';
 import { uuidv7 } from 'uuidv7';
-import { Prisma } from '@prisma/client';
+import { Prisma, type ClothingType } from '@prisma/client';
 import { StatusCodes } from 'http-status-codes';
 import { meshFetch, MeshApiError } from '@/lib/ai/mesh';
+import { generateMultimodalImage, GeminiApiError } from '@/lib/ai/gemini';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import prisma from '@/lib/prisma/extensions';
 import { uploadFittingModel, deleteFittingModel } from '@/lib/storage/fitting-model';
+import { uploadClosetImage, deleteClosetImage } from '@/lib/storage/closet-image';
 import { fittingStore, type FittingSession } from './fitting.store';
+import type { CoordiMeasurements } from './fitting.schema';
+import { CATEGORY_LABEL, buildCoordiPrompt, parseOutfitName } from './fitting.prompt';
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 const POLL_INTERVAL_MS = 5000;
@@ -375,4 +380,244 @@ export const updateFittingModel = async (userId: string, sessionId: string): Pro
     await deleteFittingModel(archive.modelUrl);
 
     return { modelUrl };
+};
+
+// ───────────────────────────── 2D 코디 생성 (Gemini) ─────────────────────────────
+// 프롬프트 구성/파싱(순수 함수)은 ./fitting.prompt 로 분리되어 있다.
+
+/** 코디 생성에 사용할 의류 1건 (캡처 이미지 + 메타데이터). measurements는 선택 사이즈 기준 납작한 치수다. */
+type CoordiGarment = {
+    category: ClothingType;
+    image: Express.Multer.File;
+    measurements: CoordiMeasurements;
+    selectedSize?: string;
+    title?: string;
+    sourceUrl?: string;
+};
+
+const AVATAR_FETCH_TIMEOUT_MS = 10_000; // 아바타 이미지가 무응답일 때 무한 대기 방지
+const RESIZE_MAX_DIMENSION = 768;
+const RESIZE_JPEG_QUALITY = 85;
+
+/** 업로드 이미지를 멀티모달 요청에 적합한 크기로 줄여 base64로 변환한다. */
+async function toResizedBase64(buffer: Buffer): Promise<string> {
+    return (
+        await sharp(buffer)
+            .resize(RESIZE_MAX_DIMENSION, RESIZE_MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: RESIZE_JPEG_QUALITY })
+            .toBuffer()
+    ).toString('base64');
+}
+
+type CoordiContext = {
+    avatarUrl: string;
+    gender: string;
+    height: number | null;
+    weight: number | null;
+    dbMeasurements: Record<string, number>;
+};
+
+/** 의류별 필수 치수를 검증한다. (measurements는 선택 사이즈 기준 납작한 치수) */
+function validateGarments(garments: CoordiGarment[]): void {
+    if (garments.length === 0) {
+        throw new AppError(ErrorCode.VALIDATION_ERROR, '의류가 최소 1개 필요합니다.', StatusCodes.BAD_REQUEST);
+    }
+    for (const g of garments) {
+        if (Object.keys(g.measurements).length === 0) {
+            throw new AppError(ErrorCode.VALIDATION_ERROR, `${CATEGORY_LABEL[g.category]} 치수 데이터가 필요합니다.`, StatusCodes.BAD_REQUEST);
+        }
+    }
+}
+
+/** 코디 생성에 필요한 아바타 URL과 신체/성별 정보를 조회한다. 아바타가 없으면 404. */
+async function loadCoordiContext(userId: string): Promise<CoordiContext> {
+    const [userCharacter, bodyInfo, profile] = await Promise.all([
+        prisma.userCharacter.findUnique({
+            where: { userId },
+            select: { imageUrl: true, character: { select: { imageUrl: true } } },
+        }),
+        prisma.bodyInfo.findFirst({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            select: { height: true, weight: true, measurements: true },
+        }),
+        prisma.profile.findUnique({ where: { userId }, select: { gender: true } }),
+    ]);
+
+    const avatarUrl = userCharacter?.imageUrl ?? userCharacter?.character?.imageUrl;
+    if (!avatarUrl) {
+        throw new AppError(ErrorCode.FITTING_FAILED, '아바타 정보가 없습니다.', StatusCodes.NOT_FOUND);
+    }
+
+    const dbMeasurements =
+        bodyInfo?.measurements && typeof bodyInfo.measurements === 'object' && !Array.isArray(bodyInfo.measurements)
+            ? (bodyInfo.measurements as Record<string, number>)
+            : {};
+
+    return {
+        avatarUrl,
+        gender: profile?.gender ?? '미제공',
+        height: bodyInfo?.height ?? null,
+        weight: bodyInfo?.weight ?? null,
+        dbMeasurements,
+    };
+}
+
+/** 아바타(타임아웃 fetch)와 의류 이미지를 리사이즈해 Gemini 멀티모달 parts를 만든다. */
+async function buildCoordiParts(avatarUrl: string, garments: CoordiGarment[], prompt: string): Promise<object[]> {
+    let avatarResponse: Response;
+    try {
+        avatarResponse = await fetch(avatarUrl, { signal: AbortSignal.timeout(AVATAR_FETCH_TIMEOUT_MS) });
+    } catch (err) {
+        const timedOut = err instanceof Error && err.name === 'TimeoutError';
+        throw new AppError(
+            ErrorCode.FITTING_FAILED,
+            timedOut ? '아바타 이미지 로딩 시간이 초과되었습니다.' : '아바타 이미지를 불러올 수 없습니다.',
+            StatusCodes.BAD_GATEWAY,
+        );
+    }
+    if (!avatarResponse.ok) {
+        throw new AppError(ErrorCode.FITTING_FAILED, '아바타 이미지를 불러올 수 없습니다.', StatusCodes.BAD_GATEWAY);
+    }
+
+    const [avatarData, garmentData] = await Promise.all([
+        toResizedBase64(Buffer.from(await avatarResponse.arrayBuffer())),
+        Promise.all(garments.map((g) => toResizedBase64(g.image.buffer))),
+    ]);
+
+    return [
+        { text: '1번 아바타 이미지:' },
+        { inlineData: { mimeType: 'image/jpeg', data: avatarData } },
+        ...garments.flatMap((g, i) => [
+            { text: `${i + 2}번 ${CATEGORY_LABEL[g.category]} 이미지:` },
+            { inlineData: { mimeType: 'image/jpeg', data: garmentData[i] } },
+        ]),
+        { text: prompt },
+    ];
+}
+
+/** Gemini 멀티모달 호출. 전송 디테일은 lib/ai/gemini가 담당하고, 여기서는 실패 reason을 HTTP 상태로 매핑한다. */
+async function runGemini(parts: object[]): Promise<{ data: string; mimeType: string; text: string }> {
+    try {
+        return await generateMultimodalImage(parts);
+    } catch (err) {
+        if (err instanceof GeminiApiError && err.reason === 'TIMEOUT') {
+            throw new AppError(ErrorCode.GEMINI_API_ERROR, 'Gemini 응답 타임아웃', StatusCodes.GATEWAY_TIMEOUT);
+        }
+        throw new AppError(ErrorCode.GEMINI_API_ERROR, '코디 이미지 생성에 실패했습니다.', StatusCodes.BAD_GATEWAY);
+    }
+}
+
+/**
+ * 코디 결과 + 각 캡처 의류 이미지를 S3에 올린다.
+ * 부분 실패 시 성공분을 보상 삭제하고 throw하여 orphan을 막는다.
+ * 반환: [코디 이미지, ...garments와 동일 순서의 의류 이미지]
+ */
+async function uploadCoordiImages(
+    userId: string,
+    coordiBuffer: Buffer,
+    coordiContentType: string,
+    garments: CoordiGarment[],
+): Promise<{ coordiImageUrl: string; clothingImageUrls: string[] }> {
+    const settled = await Promise.allSettled([
+        uploadClosetImage(userId, coordiBuffer, coordiContentType, 'coordi'),
+        ...garments.map((g) => uploadClosetImage(userId, g.image.buffer, g.image.mimetype || 'image/jpeg', 'clothing')),
+    ]);
+
+    const uploadedUrls = settled
+        .filter((s): s is PromiseFulfilledResult<string> => s.status === 'fulfilled')
+        .map((s) => s.value);
+    const rejected = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected');
+
+    if (rejected.length > 0) {
+        await Promise.all(uploadedUrls.map(deleteClosetImage));
+        console.error('[Coordi] 이미지 업로드 실패:', rejected.map((r) => r.reason));
+        throw new AppError(ErrorCode.FITTING_FAILED, '코디 이미지 저장에 실패했습니다.', StatusCodes.BAD_GATEWAY);
+    }
+
+    return { coordiImageUrl: uploadedUrls[0], clothingImageUrls: uploadedUrls.slice(1) };
+}
+
+/** closet_archive + closet_items 저장. 실패 시 업로드된 S3 객체를 보상 삭제하고 throw. */
+async function persistCoordi(
+    userId: string,
+    params: {
+        coordiImageUrl: string;
+        clothingImageUrls: string[];
+        outfitName: string;
+        height: number | null;
+        weight: number | null;
+        garments: CoordiGarment[];
+    },
+): Promise<string> {
+    const { coordiImageUrl, clothingImageUrls, outfitName, height, weight, garments } = params;
+    try {
+        const archive = await prisma.closetArchive.create({
+            data: {
+                userId,
+                imageUrl: coordiImageUrl,
+                title: outfitName,
+                bodyInfo: { height, weight }, // body_info에는 신체 정보만 기록
+                closetItems: {
+                    create: garments.map((g, i) => ({
+                        name: g.title ?? CATEGORY_LABEL[g.category],
+                        imageUrl: clothingImageUrls[i],
+                        externalLink: g.sourceUrl ?? null,
+                        type: g.category,
+                        size: g.selectedSize ?? null,
+                    })),
+                },
+            },
+            select: { id: true },
+        });
+        return archive.id;
+    } catch (err) {
+        // DB 저장 실패 시 방금 업로드한 S3 객체 보상 삭제 (orphan 방지)
+        await Promise.all([coordiImageUrl, ...clothingImageUrls].map(deleteClosetImage));
+        console.error('[Coordi] 옷장 아카이브 저장 실패:', err);
+        throw new AppError(ErrorCode.FITTING_FAILED, '코디 저장에 실패했습니다.', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+}
+
+/**
+ * 2D 코디 이미지를 생성하고 옷장 아카이브에 저장한다.
+ * 검증 → 컨텍스트 조회 → 프롬프트/파트 구성 → Gemini 생성 → S3 업로드 → DB 저장.
+ * 각 단계의 디테일(타임아웃/보상삭제/HTTP 매핑)은 헬퍼가 담당한다.
+ * @param userId
+ * @param garments  카테고리 순서로 들어오는 의류(이미지 + 치수 + 상품 정보). 최대 5개.
+ */
+export const generateCoordi = async (
+    userId: string,
+    garments: CoordiGarment[],
+): Promise<{ closetArchiveId: string; imageUrl: string; outfitName: string }> => {
+    validateGarments(garments);
+
+    const ctx = await loadCoordiContext(userId);
+
+    const prompt = buildCoordiPrompt({
+        gender: ctx.gender,
+        height: ctx.height,
+        weight: ctx.weight,
+        bodyMeasurements: ctx.dbMeasurements,
+        garments,
+    });
+    const parts = await buildCoordiParts(ctx.avatarUrl, garments, prompt);
+
+    const generated = await runGemini(parts);
+    const outfitName = parseOutfitName(generated.text);
+
+    const coordiBuffer = Buffer.from(generated.data, 'base64');
+    const coordiContentType = generated.mimeType.startsWith('image/') ? generated.mimeType : 'image/png';
+    const { coordiImageUrl, clothingImageUrls } = await uploadCoordiImages(userId, coordiBuffer, coordiContentType, garments);
+
+    const closetArchiveId = await persistCoordi(userId, {
+        coordiImageUrl,
+        clothingImageUrls,
+        outfitName,
+        height: ctx.height,
+        weight: ctx.weight,
+        garments,
+    });
+
+    return { closetArchiveId, imageUrl: coordiImageUrl, outfitName };
 };

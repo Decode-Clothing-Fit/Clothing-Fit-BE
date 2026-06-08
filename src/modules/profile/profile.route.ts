@@ -39,6 +39,7 @@ router.get('/bookmarks', authenticate, validate({ query: profilePostsQuerySchema
 // 좋아요한 게시글 목록
 router.get('/interests', authenticate, validate({ query: profilePostsQuerySchema }), getLikedPostsController);
 
+// 프로필 이미지 변경
 router.patch('/image', authenticate, singleImageUpload({ field: 'image' }), updateProfileImageController);
 
 

@@ -8,7 +8,6 @@ import {
   bookmarkResponseSchema,
 } from './posts.schema';
 import { z } from 'zod';
-import { StatusCodes } from 'http-status-codes';
 import { ErrorResponseSchema } from '@/common/schemas/api.schema';
 
 export const postsRegistry = registry;

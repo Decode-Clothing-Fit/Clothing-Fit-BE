@@ -41,6 +41,7 @@ export const getPostsResponseSchema = z
 
 export const postAuthorSchema = z
   .object({
+    id: z.string().uuid(),
     nickname: z.string().nullable(),
     imageUrl: z.string().url().nullable(),
     height: z.number().nullable(),

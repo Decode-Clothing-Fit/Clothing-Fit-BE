@@ -18,7 +18,7 @@ router.get('/nickname/check', authenticate, validate({
     query: checkNicknameSchema
 }), checkNicknameController);
 
-//  낙네임 변경
+// 닉네임 변경
 router.patch('/nickname', authenticate, validate({
      body: updateNicknameSchema
 }), updateNicknameController);

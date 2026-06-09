@@ -18,6 +18,7 @@ const SocialLoginResponseSchema = z
 const RefreshResponseSchema = z
   .object({
     accessToken: z.string().openapi({ example: 'eyJhbGci...' }),
+    refreshToken: z.string().openapi({ example: 'eyJhbGci...' }),
   })
   .openapi('RefreshResponse');
 

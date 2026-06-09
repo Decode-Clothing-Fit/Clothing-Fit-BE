@@ -124,7 +124,7 @@ export const logout = async (refreshToken: string, requesterId: string): Promise
   await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
 };
 
-export const refresh = async (refreshToken: string): Promise<{ accessToken: string }> => {
+export const refresh = async (refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> => {
   // JWT 서명 먼저 검증
   try {
     verifyRefreshToken(refreshToken);
@@ -143,7 +143,15 @@ export const refresh = async (refreshToken: string): Promise<{ accessToken: stri
     throw new AppError(ErrorCode.TOKEN_EXPIRED, '리프레시 토큰이 만료되었습니다.', StatusCodes.UNAUTHORIZED);
   }
 
+  // Refresh Token Rotation: 기존 토큰 삭제 후 새 토큰 발급
   const newAccessToken = signAccessToken({ userId: token.userId });
+  const newRefreshToken = signRefreshToken({ userId: token.userId });
 
-  return { accessToken: newAccessToken };
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+
+  await prisma.refreshToken.deleteMany({ where: { userId: token.userId } });
+  await prisma.refreshToken.create({ data: { token: newRefreshToken, userId: token.userId, expiresAt } });
+
+  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 };

@@ -6,7 +6,7 @@ import type { ClothingType } from '@prisma/client';
 const DEFAULT_OUTFIT_NAME = '데일리 코디';
 const MAX_OUTFIT_NAME_LENGTH = 20;
 
-/** 카테고리 → 한국어 표기. */
+/** 카테고리 → 한국어 표기. (service의 에러 메시지·DB 기본 상품명 등 사용자 노출용) */
 export const CATEGORY_LABEL: Record<ClothingType, string> = {
     HAT: '모자',
     OUTER: '아우터',
@@ -15,12 +15,23 @@ export const CATEGORY_LABEL: Record<ClothingType, string> = {
     SHOES: '신발',
 };
 
+/** 카테고리 → 영어 표기. (Gemini 프롬프트용) */
+export const CATEGORY_EN: Record<ClothingType, string> = {
+    HAT: 'Hat',
+    OUTER: 'Outer',
+    TOP: 'Top',
+    BOTTOM: 'Bottom',
+    SHOES: 'Shoes',
+};
+
 const SYSTEM_INSTRUCTION =
-    '당신은 패션 스타일리스트 AI입니다. 아바타 이미지와 의류 이미지들을 분석해 코디 이미지를 생성하고 코디명을 부여합니다. ' +
-    '규칙: 1. 코디명은 20자 이내 한국어로 작성합니다. 2. 의류의 색상, 디자인, 패턴은 원본 이미지와 동일하게 유지합니다. ' +
-    '3. 아바타의 얼굴형, 헤어스타일, 피부톤, 체형, 아트스타일은 절대 변경하지 않습니다. ' +
-    '4. 변경 가능한 항목은 착용 의류, 신발, 액세서리뿐입니다. ' +
-    '5. 아바타가 사람이 아닌 캐릭터(동물·가상 캐릭터·일러스트 등)이면 절대 사람으로 바꾸지 말고, 원본 캐릭터의 종·형태·아트스타일을 그대로 유지합니다.';
+    'You are a fashion stylist AI. Dress the avatar in image 1 with the provided garment images and generate a single styled outfit image. ' +
+    'Rules: 1. Reproduce each garment EXACTLY as in its source image — identical color, pattern, texture, print/logo, silhouette, and proportions. ' +
+    'Do not redesign, recolor, simplify, or add/remove any details of the garments. Only adapt their fit onto the avatar\'s body. ' +
+    '2. Reproduce the avatar (image 1) exactly as it is — same face, figure, proportions, material, color, and art style. You may only change the worn garments, shoes, and accessories. ' +
+    '3. The avatar has a smooth, featureless face. Keep it exactly that way: do not add eyes, nose, mouth, eyebrows, or hair, do not give it realistic human skin, and do not turn it into a real person. ' +
+    'It looks mannequin-like, but do NOT render it as a generic store mannequin either — simply match image 1 as closely as possible. ' +
+    '4. If the avatar is a non-human or stylized character, likewise preserve its original form and art style and never convert it into a realistic human.';
 
 /** 프롬프트 구성에 필요한 의류 정보 (이미지 등 I/O 필드는 제외). */
 export type PromptGarment = {
@@ -34,7 +45,7 @@ function formatMeasurements(measurements: Record<string, number>, separator: str
     const lines = Object.entries(measurements)
         .filter(([, v]) => typeof v === 'number')
         .map(([k, v]) => `${k} ${v}cm`);
-    return lines.length > 0 ? lines.join(separator) : '미제공';
+    return lines.length > 0 ? lines.join(separator) : 'N/A';
 }
 
 /** 의류별 [의류 정보] 블록(카테고리/선택 사이즈/치수)을 입력 순서대로 만든다. */
@@ -42,9 +53,9 @@ function buildClothingInfoBlocks(garments: PromptGarment[]): string {
     return garments
         .map((g) =>
             [
-                `- 카테고리: ${CATEGORY_LABEL[g.category]}`,
-                `- 선택 사이즈: ${g.selectedSize ?? '미지정'}`,
-                `- 치수: ${formatMeasurements(g.measurements, ' / ')}`,
+                `- Category: ${CATEGORY_EN[g.category]}`,
+                `- Selected size: ${g.selectedSize ?? 'Not specified'}`,
+                `- Measurements: ${formatMeasurements(g.measurements, ' / ')}`,
             ].join('\n'),
         )
         .join('\n\n');
@@ -64,29 +75,46 @@ export function buildCoordiPrompt(params: {
     return [
         SYSTEM_INSTRUCTION,
         '',
-        '[사용자 정보]',
-        `- 성별: ${gender}`,
-        `- 키: ${height ?? '미제공'}cm / 몸무게: ${weight ?? '미제공'}kg`,
-        `- 신체 치수: ${formatMeasurements(bodyMeasurements, ', ')}`,
+        '[User Info]',
+        `- Gender: ${gender}`,
+        `- Height: ${height ?? 'N/A'}cm / Weight: ${weight ?? 'N/A'}kg`,
+        `- Body measurements: ${formatMeasurements(bodyMeasurements, ', ')}`,
         '',
-        '[의류 정보]',
+        '[Garments]',
         buildClothingInfoBlocks(garments),
         '',
-        '[이미지]',
-        '- 1번: 아바타 (고정)',
-        `- 2번~${lastIndex}번: 카테고리 순서대로 의류`,
+        '[Images]',
+        '- Image 1: avatar (fixed)',
+        `- Images 2-${lastIndex}: garments in category order`,
         '',
-        '[요청]',
-        '1. 아바타에 의류를 모두 착용시킨 전신 코디 이미지 1장을 생성하세요.',
-        '2. 아바타 캐릭터는 절대 변형하지 마세요. 아바타가 사람이 아닌 캐릭터(동물·가상 캐릭터·일러스트 등)면 사람으로 바꾸지 말고 원본 캐릭터를 그대로 사용하세요.',
-        '3. 제공되지 않은 카테고리는 자연스럽게 완성하세요.',
-        '4. 배경은 깔끔한 스튜디오 스타일로 설정하세요.',
-        '5. 머리(얼굴) 끝부터 발끝까지 전신이 모두 프레임 안에 들어오게 구성하고, 얼굴이나 머리가 잘리지 않게 하세요.',
+        '[Request]',
+        '1. Generate a single full-body image of the avatar (image 1) wearing all the garments.',
+        '2. Keep the avatar 100% identical to image 1 — same featureless face, figure, and art style. Do not add eyes, nose, mouth, or hair, and do not make it a realistic human. Only the garments may change.',
+        '3. Remove the black base layer (leggings/tights and tight top) the avatar wears in image 1; show the avatar\'s bare body surface where the provided garments do not cover.',
+        '4. Naturally complete any categories that are not provided.',
+        '5. Use a clean studio-style background.',
+        '6. Frame the entire body from head to toe; do not crop the head.',
         '',
-        '[출력 — 매우 중요]',
-        '- 반드시 코디를 착용한 전신 이미지를 생성해서 출력하세요. 이미지 출력은 필수이며, 텍스트만 응답하는 것은 금지입니다.',
-        '- 얼굴/머리가 잘리지 않은 완전한 전신 이미지여야 합니다.',
-        '- 이미지와 함께 코디명을 "코디명: OOO" 형식의 짧은 한국어 한 줄(20자 이내)로 덧붙이세요.',
+        '[Output — VERY IMPORTANT]',
+        '- Generate and output a single full-body image of the styled outfit. (Image only.)',
+        '- The full body must be visible from head to toe without any cropping.',
+        '',
+        'CRITICAL (avatar identity): Reproduce the avatar EXACTLY as in image 1 — same smooth, featureless face ' +
+            '(no eyes, no nose, no mouth, no eyebrows, no hair, no realistic human skin), same figure and art style. ' +
+            'Do NOT turn it into a real human, and do NOT restyle it as a generic store mannequin. ONLY change the clothing.',
+        'CRITICAL (garment fidelity): Each garment must look identical to its source image — same color, pattern, print/logo, and shape. ' +
+            'Do not alter, recolor, or redesign the garments; only fit them naturally onto the body.',
+    ].join('\n');
+}
+
+/** 의류 구성으로 코디명을 짓도록 시키는 텍스트 프롬프트를 만든다 (텍스트 모델용). 지시문은 영어, 결과 코디명은 한국어. */
+export function buildOutfitNamePrompt(garments: Array<{ category: ClothingType; title?: string }>): string {
+    const lines = garments.map((g) => `- ${CATEGORY_EN[g.category]}: ${g.title ?? CATEGORY_EN[g.category]}`);
+    return [
+        'Create exactly one Korean outfit name (max 20 characters) that suits the outfit below.',
+        'Output only the outfit name text in Korean — no explanation, no quotes.',
+        '',
+        ...lines,
     ].join('\n');
 }
 

@@ -1,8 +1,9 @@
+import sharp from 'sharp';
 import { uuidv7 } from 'uuidv7';
 import { Prisma, type ClothingType } from '@prisma/client';
 import { StatusCodes } from 'http-status-codes';
 import { meshFetch, MeshApiError } from '@/lib/ai/mesh';
-import { generateMultimodalImage, GeminiApiError } from '@/lib/ai/gemini';
+import { generateMultimodalImage, generateText, GeminiApiError } from '@/lib/ai/gemini';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import prisma from '@/lib/prisma/extensions';
@@ -10,7 +11,7 @@ import { uploadFittingModel, deleteFittingModel } from '@/lib/storage/fitting-mo
 import { uploadClosetImage, deleteClosetImage } from '@/lib/storage/closet-image';
 import { fittingStore, type FittingSession } from './fitting.store';
 import type { CoordiMeasurements } from './fitting.schema';
-import { CATEGORY_LABEL, buildCoordiPrompt, parseOutfitName } from './fitting.prompt';
+import { CATEGORY_LABEL, CATEGORY_EN, buildCoordiPrompt, buildOutfitNamePrompt, parseOutfitName } from './fitting.prompt';
 import { createFitCompleteNotification } from '../notifications/notifications.service';
 
 const TTL_MS = 24 * 60 * 60 * 1000;
@@ -112,6 +113,11 @@ async function startMeshTask(sessionId: string, imageUrl: string): Promise<void>
                 should_texture: true,
                 enable_pbr: true,
                 target_formats: ['glb'],
+                // 품질 향상 옵션 (ai_model 업그레이드 없이 적용 가능)
+                model_type: 'standard', // 고디테일 메시
+                target_polycount: 50000, // 폴리곤 수 ↑ → 형태 디테일 ↑
+                should_remesh: true,
+                topology: 'quad', // 깔끔한 토폴로지
             }),
         });
         // .json() 파싱도 try 안에 둬야 본문이 비정상일 때 슬롯/카운트가 누수되지 않는다.
@@ -402,7 +408,7 @@ type CoordiGarment = {
 };
 
 const AVATAR_FETCH_TIMEOUT_MS = 10_000; // 아바타 이미지가 무응답일 때 무한 대기 방지
-const RESIZE_MAX_DIMENSION = 768;
+const RESIZE_MAX_DIMENSION = 1024; // 의류 디테일(패턴·로고) 보존을 위해 입력 해상도 상향
 const RESIZE_JPEG_QUALITY = 85;
 
 /** 업로드 이미지를 멀티모달 요청에 적합한 크기로 줄여 base64로 변환한다. */
@@ -492,18 +498,18 @@ async function buildCoordiParts(avatarUrl: string, garments: CoordiGarment[], pr
     ]);
 
     return [
-        { text: '1번 아바타 이미지:' },
+        { text: 'Image 1 — avatar:' },
         { inlineData: { mimeType: 'image/jpeg', data: avatarData } },
         ...garments.flatMap((g, i) => [
-            { text: `${i + 2}번 ${CATEGORY_LABEL[g.category]} 이미지:` },
+            { text: `Image ${i + 2} — ${CATEGORY_EN[g.category]}:` },
             { inlineData: { mimeType: 'image/jpeg', data: garmentData[i] } },
         ]),
         { text: prompt },
     ];
 }
 
-/** Gemini 멀티모달 호출. 전송 디테일은 lib/ai/gemini가 담당하고, 여기서는 실패 reason을 HTTP 상태로 매핑한다. */
-async function runGemini(parts: object[]): Promise<{ data: string; mimeType: string; text: string }> {
+/** Gemini 이미지 생성 호출. 전송 디테일은 lib/ai/gemini가 담당하고, 여기서는 실패 reason을 HTTP 상태로 매핑한다. */
+async function runGemini(parts: object[]): Promise<{ data: string; mimeType: string }> {
     try {
         return await generateMultimodalImage(parts);
     } catch (err) {
@@ -511,6 +517,20 @@ async function runGemini(parts: object[]): Promise<{ data: string; mimeType: str
             throw new AppError(ErrorCode.GEMINI_API_ERROR, 'Gemini 응답 타임아웃', StatusCodes.GATEWAY_TIMEOUT);
         }
         throw new AppError(ErrorCode.GEMINI_API_ERROR, '코디 이미지 생성에 실패했습니다.', StatusCodes.BAD_GATEWAY);
+    }
+}
+
+/**
+ * 코디명을 텍스트 모델로 별도 생성한다 (이미지 생성과 분리해 이미지 누락을 방지).
+ * 실패해도 코디 자체는 성공해야 하므로, 에러 시 기본값으로 폴백한다.
+ */
+async function generateOutfitName(garments: CoordiGarment[]): Promise<string> {
+    try {
+        const text = await generateText(buildOutfitNamePrompt(garments));
+        return parseOutfitName(text);
+    } catch (err) {
+        console.error('[Coordi] 코디명 생성 실패, 기본값 사용:', err);
+        return parseOutfitName(''); // 빈 입력 → 기본 코디명
     }
 }
 
@@ -609,8 +629,11 @@ export const generateCoordi = async (
     });
     const parts = await buildCoordiParts(ctx.avatarUrl, garments, prompt);
 
-    const generated = await runGemini(parts);
-    const outfitName = parseOutfitName(generated.text);
+    // 이미지(image 모델)와 코디명(text 모델)을 분리·병렬 실행. 코디명은 실패해도 기본값으로 폴백된다.
+    const [generated, outfitName] = await Promise.all([
+        runGemini(parts),
+        generateOutfitName(garments),
+    ]);
 
     const coordiBuffer = Buffer.from(generated.data, 'base64');
     const coordiContentType = generated.mimeType.startsWith('image/') ? generated.mimeType : 'image/png';

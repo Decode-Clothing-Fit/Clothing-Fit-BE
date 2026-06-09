@@ -6,13 +6,17 @@ import {
   deleteAllNotifications,
   deleteNotification,
   subscribeNotifications,
+  registerDeviceToken,
 } from './notifications.controller';
 import { authenticate } from '@/common/middleware/auth.middleware';
 import { validate } from '@/common/middleware/validate.middleware';
 import { type Router as RouterType, Router } from 'express';
-import { getNotificationsQuerySchema, notificationIdParamSchema, updateNotificationSettingsBodySchema } from './notifications.schema';
+import { getNotificationsQuerySchema, notificationIdParamSchema, registerDeviceTokenBodySchema, updateNotificationSettingsBodySchema } from './notifications.schema';
 
 const router: RouterType = Router();
+
+// 기기 토큰 등록
+router.post('/device-tokens', authenticate, validate({ body: registerDeviceTokenBodySchema }), registerDeviceToken);
 
 // 알림 SSE 구독
 router.get('/stream', authenticate, subscribeNotifications);

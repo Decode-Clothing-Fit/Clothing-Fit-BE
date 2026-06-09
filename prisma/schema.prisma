@@ -28,8 +28,22 @@ model User {
   receivedNotifications Notification[]      @relation("ReceivedNotifications")
   actedNotifications Notification[] @relation("ActedNotifications")
   notificationSettings NotificationSetting?
+  deviceTokens DeviceToken[]
 
   @@map("users")
+}
+
+model DeviceToken {
+  id        String   @id @db.Uuid @default(uuid())
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("device_tokens")
 }
 
 model Profile {

@@ -13,6 +13,7 @@ import { CreateNotificationInput, RawNotification } from './notifications.types'
 import { ErrorCode } from '@/common/errors/error-code';
 import { AppError } from '@/common/errors/app-error';
 import { StatusCodes } from 'http-status-codes';
+import { sendExpoPush } from '@/lib/expo-push';
 
 // SSE 이벤트 허브
 export const notificationEmitter = new EventEmitter();
@@ -187,8 +188,10 @@ const createNotification = async (
     });
     post = p ? { id: p.id, image: p.closetArchive.imageUrl } : null;
   }
+  const dto = toNotificationDto(created, { post });
 
-  notificationEmitter.emit(userChannel(input.receiverId), toNotificationDto(created, { post })); // SSE 팬아웃
+  notificationEmitter.emit(userChannel(input.receiverId), dto); // SSE 팬아웃
+  sendPushToUser(input.receiverId, dto); // 백그라운드 알림 전송
 };
 
 // 좋아요 알림
@@ -329,3 +332,50 @@ export const createFitCompleteNotification = (params: {
     message: `${params.dimension} 피팅 모델이 완성되었습니다.`,
     targetId: params.closetArchiveId,
   });
+
+// 토큰 등록
+export const registerDeviceToken = async (
+  userId: string,
+  token: string,
+): Promise<void> => {
+  await prisma.deviceToken.upsert({
+    where: { token },
+    create: { userId, token },
+    update: { userId },
+  });
+};
+
+// 토큰 삭제
+export const removeDeviceToken = async (token: string): Promise<void> => {
+  await prisma.deviceToken.deleteMany({
+    where: { token },
+  });
+};
+
+// 백그라운드 알림 전송
+const sendPushToUser = async (
+  receiverId: string,
+  dto: NotificationDto,
+): Promise<void> => {
+  const tokens = await prisma.deviceToken.findMany({
+    where: { userId: receiverId },
+    select: { token: true },
+  });
+  if (!tokens.length) return;
+
+  const { invalidTokens } = await sendExpoPush(
+    tokens.map((t) => ({
+      to: t.token,
+      title: '알림', // 필요하면 타입별로 분기 가능
+      body: dto.message,
+      data: { notificationId: dto.id, type: dto.type }, // 탭 시 딥링크용
+    })),
+  );
+
+  // 죽은 토큰 정리
+  if (invalidTokens.length) {
+    await prisma.deviceToken.deleteMany({
+      where: { token: { in: invalidTokens } },
+    });
+  }
+};

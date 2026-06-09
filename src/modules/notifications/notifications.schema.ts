@@ -60,3 +60,9 @@ export type NotificationIdParam = z.infer<typeof notificationIdParamSchema>;
 // 알림 SSE 구독
 export const notificationEventSchema = notificationSchema;
 export type NotificationEvent = z.infer<typeof notificationEventSchema>;
+
+// 기기 토큰 관련
+export const registerDeviceTokenBodySchema = z.object({
+  token: z.string().min(1),
+});
+export type RegisterDeviceTokenBody = z.infer<typeof registerDeviceTokenBodySchema>;

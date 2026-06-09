@@ -1,6 +1,7 @@
 import { registry } from '@/config/registry';
 import { z } from 'zod';
 import { ErrorResponseSchema } from '@/common/schemas/api.schema';
+import { logoutBodySchema } from './auth.schema';
 
 const TooManyRequestsResponse = {
   description: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.',
@@ -90,9 +91,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            refreshToken: z.string().openapi({ example: '리프레시_토큰' }),
-          }),
+          schema: logoutBodySchema,
         },
       },
     },

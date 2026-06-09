@@ -8,6 +8,7 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '@/common/
 import prisma from '@/lib/prisma/extensions';
 import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.types';
 import { env } from '@/config/env';
+import { removeDeviceToken } from '../notifications/notifications.service';
 
 // ── Kakao ──────────────────────────────────────────────────────────────────
 
@@ -112,7 +113,7 @@ export const googleLogin = async (idToken: string): Promise<SocialLoginResult> =
 
 // ── Token ──────────────────────────────────────────────────────────────────
 
-export const logout = async (refreshToken: string, requesterId: string): Promise<void> => {
+export const logout = async (refreshToken: string, requesterId: string, deviceToken?: string): Promise<void> => {
   const token = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
 
   if (!token) {
@@ -125,6 +126,10 @@ export const logout = async (refreshToken: string, requesterId: string): Promise
   }
 
   await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+
+  if (deviceToken) {
+    await removeDeviceToken(deviceToken);
+  }
 };
 
 export const refresh = async (refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> => {

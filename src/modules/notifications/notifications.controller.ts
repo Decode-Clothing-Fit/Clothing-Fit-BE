@@ -9,6 +9,7 @@ import type {
   NotificationDto,
 } from './notifications.schema';
 import { StatusCodes } from 'http-status-codes';
+import type { RegisterDeviceTokenBody } from './notifications.schema';
 
 // 알림 목록 조회
 export const getNotifications = asyncHandler(async (req: Request, res: Response) => {
@@ -95,4 +96,13 @@ export const subscribeNotifications = asyncHandler(async (req: Request, res: Res
     notificationEmitter.off(channel, onNotification);
     res.end();
   });
+});
+
+// 백그라운드 알림 전송
+export const registerDeviceToken = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const { token } = req.body as unknown as RegisterDeviceTokenBody;
+
+  await notificationService.registerDeviceToken(userId, token);
+  res.status(204).send();
 });

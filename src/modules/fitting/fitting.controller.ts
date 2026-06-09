@@ -47,7 +47,8 @@ export const generateCoordiController = asyncHandler(async (req: Request, res: R
             image,
             measurements: item.selectedMeasurements,
             selectedSize: item.selectedSize,
-            title: item.title,
+            brand: item.brand,
+            name: item.name,
             sourceUrl: item.sourceUrl,
         };
     });

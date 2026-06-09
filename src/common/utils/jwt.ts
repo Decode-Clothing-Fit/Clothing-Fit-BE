@@ -10,9 +10,9 @@ export const signRefreshToken = (payload: { userId: string }): string => {
 };
 
 export const verifyAccessToken = (token: string): jwt.JwtPayload => {
-  return jwt.verify(token, env.JWT_ACCESS_SECRET) as jwt.JwtPayload;
+  return jwt.verify(token, env.JWT_ACCESS_SECRET, { algorithms: ['HS256'] }) as jwt.JwtPayload;
 };
 
 export const verifyRefreshToken = (token: string): jwt.JwtPayload => {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET) as jwt.JwtPayload;
+  return jwt.verify(token, env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] }) as jwt.JwtPayload;
 };

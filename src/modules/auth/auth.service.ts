@@ -1,11 +1,12 @@
-import { Provider } from '@prisma/client';
+import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
+import { Prisma, Provider } from '@prisma/client';
+import { StatusCodes } from 'http-status-codes';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
-import { StatusCodes } from 'http-status-codes';
-import { signAccessToken, signRefreshToken } from '@/common/utils/jwt';
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from '@/common/utils/jwt';
 import prisma from '@/lib/prisma/extensions';
 import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.types';
-import { OAuth2Client } from 'google-auth-library';
 import { env } from '@/config/env';
 
 // ── Kakao ──────────────────────────────────────────────────────────────────
@@ -48,7 +49,8 @@ export const kakaoLogin = async (accessToken: string): Promise<SocialLoginResult
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30);
 
-  await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+  // 만료된 토큰만 정리 (다른 기기의 유효한 토큰은 유지)
+  await prisma.refreshToken.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
   await prisma.refreshToken.create({ data: { token: newRefreshToken, userId: user.id, expiresAt } });
 
   return { accessToken: newAccessToken, refreshToken: newRefreshToken, isNewUser };
@@ -101,7 +103,8 @@ export const googleLogin = async (idToken: string): Promise<SocialLoginResult> =
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30);
 
-  await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+  // 만료된 토큰만 정리 (다른 기기의 유효한 토큰은 유지)
+  await prisma.refreshToken.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
   await prisma.refreshToken.create({ data: { token: newRefreshToken, userId: user.id, expiresAt } });
 
   return { accessToken: newAccessToken, refreshToken: newRefreshToken, isNewUser };
@@ -109,29 +112,55 @@ export const googleLogin = async (idToken: string): Promise<SocialLoginResult> =
 
 // ── Token ──────────────────────────────────────────────────────────────────
 
-export const logout = async (refreshToken: string): Promise<void> => {
+export const logout = async (refreshToken: string, requesterId: string): Promise<void> => {
   const token = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
 
   if (!token) {
     throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
+  }
+
+  // 본인 토큰인지 확인
+  if (token.userId !== requesterId) {
+    throw new AppError(ErrorCode.UNAUTHORIZED, '권한이 없습니다.', StatusCodes.UNAUTHORIZED);
   }
 
   await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
 };
 
-export const refresh = async (refreshToken: string): Promise<{ accessToken: string }> => {
-  const token = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
-
-  if (!token) {
+export const refresh = async (refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> => {
+  // JWT 서명 및 만료 검증
+  try {
+    verifyRefreshToken(refreshToken);
+  } catch (e) {
+    if (e instanceof jwt.TokenExpiredError) {
+      throw new AppError(ErrorCode.TOKEN_EXPIRED, '리프레시 토큰이 만료되었습니다.', StatusCodes.UNAUTHORIZED);
+    }
     throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
   }
 
+  // 토큰 원자적 삭제 - 동시 요청 시 한 건만 성공, 나머지는 P2025로 차단
+  let token;
+  try {
+    token = await prisma.refreshToken.delete({ where: { token: refreshToken } });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+      throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
+    }
+    throw e;
+  }
+
   if (token.expiresAt < new Date()) {
-    await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
     throw new AppError(ErrorCode.TOKEN_EXPIRED, '리프레시 토큰이 만료되었습니다.', StatusCodes.UNAUTHORIZED);
   }
 
+  // Refresh Token Rotation: 사용한 토큰만 삭제 후 새 토큰 발급 (다중 기기 지원)
   const newAccessToken = signAccessToken({ userId: token.userId });
+  const newRefreshToken = signRefreshToken({ userId: token.userId });
 
-  return { accessToken: newAccessToken };
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+
+  await prisma.refreshToken.create({ data: { token: newRefreshToken, userId: token.userId, expiresAt } });
+
+  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 };

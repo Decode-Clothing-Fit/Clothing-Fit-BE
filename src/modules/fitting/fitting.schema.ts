@@ -42,7 +42,8 @@ export const CoordiItemSchema = z
         imageField: z.string().min(1).openapi({ description: '이 의류 이미지의 multipart 파일 필드명', example: 'image_top' }),
         selectedMeasurements: CoordiMeasurementsSchema.openapi({ description: '선택 사이즈의 치수 (항목명 동적)' }),
         selectedSize: z.string().optional().openapi({ description: '선택한 사이즈 라벨 (동적: M, 270, FREE…)', example: 'M' }),
-        title: z.string().optional().openapi({ description: '상품명 (브랜드 포함)', example: '아디다스 트랙탑' }),
+        brand: z.string().min(1, '브랜드명을 입력해주세요.').openapi({ description: '브랜드명', example: '아디다스' }),
+        name: z.string().min(1, '상품명을 입력해주세요.').openapi({ description: '상품명 (브랜드 제외)', example: '와플 반팔 폴로 셔츠' }),
         sourceUrl: z.string().url().optional().openapi({ description: '제품 사이트 링크', example: 'https://www.musinsa.com/products/123' }),
         sizeTableSource: z
             .enum(['actual', 'html', 'image', 'reference'])
@@ -74,7 +75,8 @@ export const GenerateCoordiRequestSchema = z
                         selectedSize: 'M',
                         imageField: 'image_top',
                         selectedMeasurements: { 가슴단면: 52, 어깨너비: 44, 총장: 70 },
-                        title: '아디다스 트랙탑',
+                        brand: '아디다스',
+                        name: '와플 반팔 폴로 셔츠',
                         sourceUrl: 'https://www.musinsa.com/products/123',
                         sizeTableSource: 'html',
                         sizeTable: { M: { 가슴단면: 52, 총장: 70 }, L: { 가슴단면: 55, 총장: 72 } },

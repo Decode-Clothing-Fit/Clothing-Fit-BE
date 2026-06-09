@@ -46,7 +46,9 @@ async function generateImageOnce(parts: object[]): Promise<GeneratedImage> {
             gemini.models.generateContent({
                 model: GEMINI_IMAGE_MODEL,
                 contents: [{ role: 'user', parts }],
-                config: { responseModalities: ['IMAGE'] },
+                // temperature를 낮춰 모델이 원본 의류 색/디테일을 "재해석"하지 않고 충실히 재현하도록 한다.
+                // (기본 1.0에서는 매 호출마다 색을 임의로 조화·변형하는 경향이 있음)
+                config: { responseModalities: ['IMAGE'], temperature: 0.2 },
             }),
             timeout,
         ]);

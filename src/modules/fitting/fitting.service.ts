@@ -403,20 +403,28 @@ type CoordiGarment = {
     image: Express.Multer.File;
     measurements: CoordiMeasurements;
     selectedSize?: string;
-    title?: string;
+    brand: string;
+    name: string;
     sourceUrl?: string;
 };
 
+/** 코디명 생성 프롬프트에 넘길 상품 표시명 ("브랜드 상품명"). 저장은 brand/name을 컬럼별로 따로 한다. */
+function garmentDisplayName(g: CoordiGarment): string {
+    return `${g.brand} ${g.name}`;
+}
+
 const AVATAR_FETCH_TIMEOUT_MS = 10_000; // 아바타 이미지가 무응답일 때 무한 대기 방지
 const RESIZE_MAX_DIMENSION = 1024; // 의류 디테일(패턴·로고) 보존을 위해 입력 해상도 상향
-const RESIZE_JPEG_QUALITY = 85;
 
-/** 업로드 이미지를 멀티모달 요청에 적합한 크기로 줄여 base64로 변환한다. */
+/**
+ * 업로드 이미지를 멀티모달 요청에 적합한 크기로 줄여 base64로 변환한다.
+ * 색이 임의로 틀어지는 것을 막기 위해 JPEG 재압축 대신 무손실 PNG로 인코딩한다.
+ */
 async function toResizedBase64(buffer: Buffer): Promise<string> {
     return (
         await sharp(buffer)
             .resize(RESIZE_MAX_DIMENSION, RESIZE_MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
-            .jpeg({ quality: RESIZE_JPEG_QUALITY })
+            .png()
             .toBuffer()
     ).toString('base64');
 }
@@ -499,10 +507,10 @@ async function buildCoordiParts(avatarUrl: string, garments: CoordiGarment[], pr
 
     return [
         { text: 'Image 1 — avatar:' },
-        { inlineData: { mimeType: 'image/jpeg', data: avatarData } },
+        { inlineData: { mimeType: 'image/png', data: avatarData } },
         ...garments.flatMap((g, i) => [
             { text: `Image ${i + 2} — ${CATEGORY_EN[g.category]}:` },
-            { inlineData: { mimeType: 'image/jpeg', data: garmentData[i] } },
+            { inlineData: { mimeType: 'image/png', data: garmentData[i] } },
         ]),
         { text: prompt },
     ];
@@ -526,7 +534,9 @@ async function runGemini(parts: object[]): Promise<{ data: string; mimeType: str
  */
 async function generateOutfitName(garments: CoordiGarment[]): Promise<string> {
     try {
-        const text = await generateText(buildOutfitNamePrompt(garments));
+        const text = await generateText(
+            buildOutfitNamePrompt(garments.map((g) => ({ category: g.category, title: garmentDisplayName(g) }))),
+        );
         return parseOutfitName(text);
     } catch (err) {
         console.error('[Coordi] 코디명 생성 실패, 기본값 사용:', err);
@@ -586,7 +596,8 @@ async function persistCoordi(
                 bodyInfo: { height, weight }, // body_info에는 신체 정보만 기록
                 closetItems: {
                     create: garments.map((g, i) => ({
-                        name: g.title ?? CATEGORY_LABEL[g.category],
+                        brand: g.brand,
+                        name: g.name,
                         imageUrl: clothingImageUrls[i],
                         externalLink: g.sourceUrl ?? null,
                         type: g.category,

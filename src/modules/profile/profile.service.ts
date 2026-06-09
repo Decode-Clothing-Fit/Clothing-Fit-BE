@@ -288,7 +288,8 @@ export const updateProfileImage = async (userId: string, file: Express.Multer.Fi
 
   if (oldImageUrl) {
     const oldKey = oldImageUrl.split('.amazonaws.com/')[1];
-    if (oldKey) {
+    // profiles/ 경로에 속한 키만 삭제 (임의 S3 객체 삭제 방지)
+    if (oldKey && oldKey.startsWith('profiles/')) {
       await s3Client.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: oldKey }));
     }
   }

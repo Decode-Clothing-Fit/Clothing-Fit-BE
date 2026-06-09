@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import { AppError } from '../errors/app-error';
 import { ErrorCode } from '../errors/error-code';
 import { verifyAccessToken } from '../utils/jwt';
@@ -17,8 +18,12 @@ export const authenticate = (req: Request, _res: Response, next: NextFunction): 
     const payload = verifyAccessToken(token);
     req.user = { id: payload['userId'] as string, email: payload['email'] as string };
     next();
-  } catch {
-    next(new AppError(ErrorCode.TOKEN_EXPIRED, '토큰이 만료되었습니다.', 401));
+  } catch (e) {
+    if (e instanceof jwt.TokenExpiredError) {
+      next(new AppError(ErrorCode.TOKEN_EXPIRED, '토큰이 만료되었습니다.', 401));
+    } else {
+      next(new AppError(ErrorCode.UNAUTHORIZED, '유효하지 않은 토큰입니다.', 401));
+    }
   }
 };
 

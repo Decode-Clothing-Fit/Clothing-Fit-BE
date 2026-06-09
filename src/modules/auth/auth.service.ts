@@ -2,7 +2,7 @@ import { Provider } from '@prisma/client';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { StatusCodes } from 'http-status-codes';
-import { signAccessToken, signRefreshToken } from '@/common/utils/jwt';
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from '@/common/utils/jwt';
 import prisma from '@/lib/prisma/extensions';
 import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.types';
 import { OAuth2Client } from 'google-auth-library';
@@ -109,17 +109,29 @@ export const googleLogin = async (idToken: string): Promise<SocialLoginResult> =
 
 // ── Token ──────────────────────────────────────────────────────────────────
 
-export const logout = async (refreshToken: string): Promise<void> => {
+export const logout = async (refreshToken: string, requesterId: string): Promise<void> => {
   const token = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
 
   if (!token) {
     throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
   }
 
+  // 본인 토큰인지 확인
+  if (token.userId !== requesterId) {
+    throw new AppError(ErrorCode.UNAUTHORIZED, '권한이 없습니다.', StatusCodes.UNAUTHORIZED);
+  }
+
   await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
 };
 
 export const refresh = async (refreshToken: string): Promise<{ accessToken: string }> => {
+  // JWT 서명 먼저 검증
+  try {
+    verifyRefreshToken(refreshToken);
+  } catch {
+    throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
+  }
+
   const token = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
 
   if (!token) {

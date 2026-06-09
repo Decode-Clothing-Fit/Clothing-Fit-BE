@@ -1,15 +1,25 @@
 import { type Router as RouterType, Router } from 'express';
 import { authenticate } from '@/common/middleware/auth.middleware';
 import { validate } from '@/common/middleware/validate.middleware';
+import { anyImageUpload } from '@/common/middleware/upload.middleware';
 import {
     start3DFittingController,
     get3DFittingStatusController,
     updateFittingTitleController,
-    updateFittingModelController
+    updateFittingModelController,
+    generateCoordiController
 } from './fitting.controller';
-import { Fitting3DRequestSchema, SessionIdParamSchema, FittingTitleParamSchema, FittingTitleBodySchema } from './fitting.schema';
+import {
+    Fitting3DRequestSchema,
+    SessionIdParamSchema,
+    FittingTitleParamSchema,
+    FittingTitleBodySchema,
+} from './fitting.schema';
 
 const router: RouterType = Router();
+
+// 2d 코디 생성 api (의류 이미지 최대 5개, 필드명은 meta.items[].imageField로 지정)
+router.post('/2d', authenticate, anyImageUpload(), generateCoordiController);
 
 // 3d 생성 api
 router.post('/3d', authenticate, validate({ body: Fitting3DRequestSchema }), start3DFittingController);

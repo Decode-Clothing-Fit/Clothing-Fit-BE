@@ -13,7 +13,11 @@ import { env } from '@/config/env';
 export const getProfile = async (userId: string) => {
   const user = await prisma.user.findFirst({
     where: { id: userId, deletedAt: null },
-    include: { profile: true },
+    include: {
+      profile: true,
+      bodyInfo: true,
+      _count: { select: { followers: true, following: true } },
+    },
   });
 
   if (!user) {
@@ -24,6 +28,10 @@ export const getProfile = async (userId: string) => {
     nickname: user.profile?.nickname ?? user.name,
     imageUrl: user.profile?.imageUrl ?? null,
     gender: user.profile?.gender ?? null,
+    height: user.bodyInfo?.height ?? null,
+    weight: user.bodyInfo?.weight ?? null,
+    followerCount: user._count.followers,
+    followingCount: user._count.following,
   };
 };
 

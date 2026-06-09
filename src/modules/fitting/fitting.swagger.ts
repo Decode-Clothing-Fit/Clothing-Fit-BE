@@ -8,7 +8,63 @@ import {
     FittingTitleParamSchema,
     FittingTitleBodySchema,
     UpdateFittingModelResponseSchema,
+    GenerateCoordiRequestSchema,
+    GenerateCoordiResponseSchema,
 } from './fitting.schema';
+
+registry.registerPath({
+    method: 'post',
+    path: '/fitting/2d',
+    tags: ['Fitting'],
+    summary: '2D 코디 생성',
+    description:
+        'multipart/form-data로 의류 이미지(최대 5개)와 `meta` JSON을 함께 보냅니다. ' +
+        '`meta`는 `{ "items": [...] }` 형태이며, 각 item의 `imageField`가 함께 보낸 multipart 파일 필드명을 가리킵니다(예: image_top). ' +
+        '각 item은 category(소문자 가능), selectedMeasurements(선택 사이즈 기준 납작한 치수), selectedSize, title(상품명), sourceUrl(제품 링크), sizeTable/sizeTableSource를 가집니다. 체형은 보내지 않습니다. ' +
+        '신체 치수·성별은 토큰의 user_id로 DB(body_info, profiles)에서, 아바타는 user_character에서 조회합니다. ' +
+        'Gemini 호출은 타임아웃(60초)과 1회 재시도를 적용하며, 생성된 코디 이미지와 코디명은 closet_archive(+의류별 closet_items)에 저장됩니다.',
+    security: [{ bearerAuth: [] }],
+    request: {
+        body: {
+            required: true,
+            content: {
+                'multipart/form-data': {
+                    schema: GenerateCoordiRequestSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        201: {
+            description: '코디 생성 및 저장 성공',
+            content: { 'application/json': { schema: GenerateCoordiResponseSchema } },
+        },
+        400: {
+            description: '필수 데이터 누락 또는 형식 오류 (이미지/카테고리/치수)',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        401: {
+            description: '인증 필요',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        404: {
+            description: '아바타 정보 없음',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        500: {
+            description: '코디 저장 실패',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        502: {
+            description: 'Gemini 코디 생성 실패 (재시도 후) 또는 이미지 저장 실패',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        504: {
+            description: 'Gemini 응답 타임아웃',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+    },
+});
 
 registry.registerPath({
     method: 'post',

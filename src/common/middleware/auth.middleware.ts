@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { StatusCodes } from 'http-status-codes';
 import { AppError } from '../errors/app-error';
 import { ErrorCode } from '../errors/error-code';
 import { verifyAccessToken } from '../utils/jwt';
@@ -8,7 +9,7 @@ export const authenticate = (req: Request, _res: Response, next: NextFunction): 
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith('Bearer ')) {
-    next(new AppError(ErrorCode.UNAUTHORIZED, '인증이 필요합니다.', 401));
+    next(new AppError(ErrorCode.UNAUTHORIZED, '인증이 필요합니다.', StatusCodes.UNAUTHORIZED));
     return;
   }
 
@@ -20,9 +21,9 @@ export const authenticate = (req: Request, _res: Response, next: NextFunction): 
     next();
   } catch (e) {
     if (e instanceof jwt.TokenExpiredError) {
-      next(new AppError(ErrorCode.TOKEN_EXPIRED, '토큰이 만료되었습니다.', 401));
+      next(new AppError(ErrorCode.TOKEN_EXPIRED, '토큰이 만료되었습니다.', StatusCodes.UNAUTHORIZED));
     } else {
-      next(new AppError(ErrorCode.UNAUTHORIZED, '유효하지 않은 토큰입니다.', 401));
+      next(new AppError(ErrorCode.UNAUTHORIZED, '유효하지 않은 토큰입니다.', StatusCodes.UNAUTHORIZED));
     }
   }
 };

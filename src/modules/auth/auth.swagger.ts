@@ -85,6 +85,7 @@ registry.registerPath({
   path: '/auth/logout',
   tags: ['Auth'],
   summary: '로그아웃',
+  security: [{ bearerAuth: [] }],
   request: {
     body: {
       content: {

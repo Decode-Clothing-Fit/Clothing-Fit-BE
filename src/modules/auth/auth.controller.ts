@@ -13,8 +13,9 @@ export const kakaoLoginController = asyncHandler(async (req: Request, res: Respo
 
 export const logoutController = asyncHandler(async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
+  const requesterId = req.user!.id;
 
-  await logout(refreshToken);
+  await logout(refreshToken, requesterId);
 
   res.status(StatusCodes.OK).send();
 });

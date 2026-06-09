@@ -18,6 +18,7 @@ const SocialLoginResponseSchema = z
 const RefreshResponseSchema = z
   .object({
     accessToken: z.string().openapi({ example: 'eyJhbGci...' }),
+    refreshToken: z.string().openapi({ example: 'eyJhbGci...' }),
   })
   .openapi('RefreshResponse');
 
@@ -84,6 +85,7 @@ registry.registerPath({
   path: '/auth/logout',
   tags: ['Auth'],
   summary: '로그아웃',
+  security: [{ bearerAuth: [] }],
   request: {
     body: {
       content: {

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
-import { Provider } from '@prisma/client';
+import { Prisma, Provider } from '@prisma/client';
 import { StatusCodes } from 'http-status-codes';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
@@ -138,14 +138,18 @@ export const refresh = async (refreshToken: string): Promise<{ accessToken: stri
     throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
   }
 
-  const token = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
-
-  if (!token) {
-    throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
+  // 토큰 원자적 삭제 - 동시 요청 시 한 건만 성공, 나머지는 P2025로 차단
+  let token;
+  try {
+    token = await prisma.refreshToken.delete({ where: { token: refreshToken } });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+      throw new AppError(ErrorCode.INVALID_TOKEN, '유효하지 않은 리프레시 토큰입니다.', StatusCodes.UNAUTHORIZED);
+    }
+    throw e;
   }
 
   if (token.expiresAt < new Date()) {
-    await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
     throw new AppError(ErrorCode.TOKEN_EXPIRED, '리프레시 토큰이 만료되었습니다.', StatusCodes.UNAUTHORIZED);
   }
 
@@ -156,7 +160,6 @@ export const refresh = async (refreshToken: string): Promise<{ accessToken: stri
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30);
 
-  await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
   await prisma.refreshToken.create({ data: { token: newRefreshToken, userId: token.userId, expiresAt } });
 
   return { accessToken: newAccessToken, refreshToken: newRefreshToken };

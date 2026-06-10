@@ -128,7 +128,7 @@ export const logout = async (refreshToken: string, requesterId: string, deviceTo
   await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
 
   if (deviceToken) {
-    await removeDeviceToken(deviceToken);
+    await removeDeviceToken(deviceToken, token.userId);
   }
 };
 

@@ -346,9 +346,9 @@ export const registerDeviceToken = async (
 };
 
 // 토큰 삭제
-export const removeDeviceToken = async (token: string): Promise<void> => {
+export const removeDeviceToken = async (token: string, userId: string): Promise<void> => {
   await prisma.deviceToken.deleteMany({
-    where: { token },
+    where: { token, userId },
   });
 };
 

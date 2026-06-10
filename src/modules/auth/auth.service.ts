@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
-import { Prisma, Provider } from '@prisma/client';
+import { Gender, Prisma, Provider } from '@prisma/client';
 import { StatusCodes } from 'http-status-codes';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
@@ -9,6 +9,33 @@ import prisma from '@/lib/prisma/extensions';
 import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.types';
 import { env } from '@/config/env';
 import { removeDeviceToken } from '../notifications/notifications.service';
+
+// ── Profile ────────────────────────────────────────────────────────────────
+
+/**
+ * 신규 유저 기본 프로필 생성
+ * - 닉네임 중복 시 P2002를 캐치하고 이름_랜덤4자리로 재시도 (최대 5회)
+ * - findFirst + upsert 패턴의 race condition 방지
+ */
+const createDefaultProfile = async (userId: string, name: string, imageUrl: string | null): Promise<void> => {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const nickname = attempt === 0 ? name : `${name}_${Math.floor(1000 + Math.random() * 9000)}`;
+    try {
+      await prisma.profile.upsert({
+        where: { userId },
+        update: {},
+        create: { userId, nickname, imageUrl, gender: Gender.MALE },
+      });
+      return;
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        continue; // 닉네임 충돌 → 다음 시도에서 랜덤 접미사 사용
+      }
+      throw e;
+    }
+  }
+  throw new AppError(ErrorCode.INTERNAL_ERROR, '닉네임 생성에 실패했습니다.', StatusCodes.INTERNAL_SERVER_ERROR);
+};
 
 // ── Kakao ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +69,12 @@ export const kakaoLogin = async (accessToken: string): Promise<SocialLoginResult
   } else if (user.deletedAt) {
     user = await prisma.user.update({ where: { id: user.id }, data: { deletedAt: null, name } });
     isNewUser = true;
+  }
+
+  // 신규 유저 기본 프로필 생성
+  if (isNewUser) {
+    const imageUrl = kakaoUser.kakao_account?.profile?.profile_image_url ?? null;
+    await createDefaultProfile(user.id, name, imageUrl);
   }
 
   const newAccessToken = signAccessToken({ userId: user.id });
@@ -96,6 +129,12 @@ export const googleLogin = async (idToken: string): Promise<SocialLoginResult> =
   } else if (user.deletedAt) {
     user = await prisma.user.update({ where: { id: user.id }, data: { deletedAt: null, name } });
     isNewUser = true;
+  }
+
+  // 신규 유저 기본 프로필 생성
+  if (isNewUser) {
+    const imageUrl = googleUser.picture ?? null;
+    await createDefaultProfile(user.id, name, imageUrl);
   }
 
   const newAccessToken = signAccessToken({ userId: user.id });

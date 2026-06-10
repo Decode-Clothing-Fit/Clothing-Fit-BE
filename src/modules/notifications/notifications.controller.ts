@@ -104,5 +104,5 @@ export const registerDeviceToken = asyncHandler(async (req: Request, res: Respon
   const { token } = req.body as unknown as RegisterDeviceTokenBody;
 
   await notificationService.registerDeviceToken(userId, token);
-  res.status(204).send();
+  res.status(StatusCodes.NO_CONTENT).send();
 });

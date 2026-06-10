@@ -43,6 +43,18 @@ export const kakaoLogin = async (accessToken: string): Promise<SocialLoginResult
     isNewUser = true;
   }
 
+  // 신규 유저 기본 프로필 생성
+  if (isNewUser) {
+    const imageUrl = kakaoUser.kakao_account?.profile?.profile_image_url ?? null;
+    const existing = await prisma.profile.findFirst({ where: { nickname: name } });
+    const nickname = existing ? `${name}_${Math.floor(1000 + Math.random() * 9000)}` : name;
+    await prisma.profile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, nickname, imageUrl, gender: 'MALE' },
+    });
+  }
+
   const newAccessToken = signAccessToken({ userId: user.id });
   const newRefreshToken = signRefreshToken({ userId: user.id });
 
@@ -95,6 +107,18 @@ export const googleLogin = async (idToken: string): Promise<SocialLoginResult> =
   } else if (user.deletedAt) {
     user = await prisma.user.update({ where: { id: user.id }, data: { deletedAt: null, name } });
     isNewUser = true;
+  }
+
+  // 신규 유저 기본 프로필 생성
+  if (isNewUser) {
+    const imageUrl = googleUser.picture ?? null;
+    const existing = await prisma.profile.findFirst({ where: { nickname: name } });
+    const nickname = existing ? `${name}_${Math.floor(1000 + Math.random() * 9000)}` : name;
+    await prisma.profile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, nickname, imageUrl, gender: 'MALE' },
+    });
   }
 
   const newAccessToken = signAccessToken({ userId: user.id });

@@ -131,10 +131,11 @@ model ClosetItem {
 }
 
 model Post {
-  id               String   @id @db.Uuid @default(uuid())
-  userId           String   @map("user_id") @db.Uuid
-  closetArchiveId  String   @unique @map("closet_archive_id") @db.Uuid
-  createdAt        DateTime @default(now()) @map("created_at")
+  id               String    @id @db.Uuid @default(uuid())
+  userId           String    @map("user_id") @db.Uuid
+  closetArchiveId  String    @unique @map("closet_archive_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  deletedAt        DateTime? @map("deleted_at")
 
   user          User          @relation(fields: [userId], references: [id])
   closetArchive ClosetArchive @relation(fields: [closetArchiveId], references: [id])

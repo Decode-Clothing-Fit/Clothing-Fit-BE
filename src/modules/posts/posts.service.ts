@@ -193,6 +193,21 @@ export const getPostByIdService = async (id: string, userId: string) => {
   };
 };
 
+// 게시글 삭제 (소프트딜리트)
+export const deletePostService = async (id: string, userId: string): Promise<void> => {
+  const post = await prisma.post.findUnique({ where: { id } });
+
+  if (!post || post.deletedAt) {
+    throw new AppError(ErrorCode.POST_NOT_FOUND, '게시글이 존재하지 않습니다.', StatusCodes.NOT_FOUND);
+  }
+
+  if (post.userId !== userId) {
+    throw new AppError(ErrorCode.NOT_POST_OWNER, '게시글을 삭제할 권한이 없습니다.', StatusCodes.FORBIDDEN);
+  }
+
+  await prisma.post.update({ where: { id }, data: { deletedAt: new Date() } });
+};
+
 // 좋아요
 export const likePostService = async (userId: string, postId: string) => {
   const [, likeCount] = await prisma.$transaction([

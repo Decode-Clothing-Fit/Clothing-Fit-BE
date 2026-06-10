@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { bookmarkPostService, getPostByIdService, getPostsService, likePostService, unbookmarkPostService, unlikePostService } from './posts.service';
+import { bookmarkPostService, deletePostService, getPostByIdService, getPostsService, likePostService, unbookmarkPostService, unlikePostService } from './posts.service';
 import type { GetPostsQuery, PostIdParam } from './posts.schema';
 import { asyncHandler } from '@/common/utils/async.handler';
 
@@ -13,6 +13,12 @@ export const getPosts = asyncHandler(async (req: Request, res: Response) => {
 export const getPostById = asyncHandler(async (req: Request, res: Response) => {
   const result = await getPostByIdService((req.params as unknown as PostIdParam).id, req.user!.id);
   res.status(200).json(result);
+});
+
+// 게시글 삭제
+export const deletePost = asyncHandler(async (req: Request, res: Response) => {
+  await deletePostService((req.params as unknown as PostIdParam).id, req.user!.id);
+  res.status(204).send();
 });
 
 // 좋아요

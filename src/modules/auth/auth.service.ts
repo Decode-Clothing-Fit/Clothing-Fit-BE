@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
-import { Prisma, Provider } from '@prisma/client';
+import { Gender, Prisma, Provider } from '@prisma/client';
 import { StatusCodes } from 'http-status-codes';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
@@ -8,6 +8,33 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '@/common/
 import prisma from '@/lib/prisma/extensions';
 import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.types';
 import { env } from '@/config/env';
+
+// ── Profile ────────────────────────────────────────────────────────────────
+
+/**
+ * 신규 유저 기본 프로필 생성
+ * - 닉네임 중복 시 P2002를 캐치하고 이름_랜덤4자리로 재시도 (최대 5회)
+ * - findFirst + upsert 패턴의 race condition 방지
+ */
+const createDefaultProfile = async (userId: string, name: string, imageUrl: string | null): Promise<void> => {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const nickname = attempt === 0 ? name : `${name}_${Math.floor(1000 + Math.random() * 9000)}`;
+    try {
+      await prisma.profile.upsert({
+        where: { userId },
+        update: {},
+        create: { userId, nickname, imageUrl, gender: Gender.MALE },
+      });
+      return;
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        continue; // 닉네임 충돌 → 다음 시도에서 랜덤 접미사 사용
+      }
+      throw e;
+    }
+  }
+  throw new AppError(ErrorCode.INTERNAL_ERROR, '닉네임 생성에 실패했습니다.', StatusCodes.INTERNAL_SERVER_ERROR);
+};
 
 // ── Kakao ──────────────────────────────────────────────────────────────────
 
@@ -46,13 +73,7 @@ export const kakaoLogin = async (accessToken: string): Promise<SocialLoginResult
   // 신규 유저 기본 프로필 생성
   if (isNewUser) {
     const imageUrl = kakaoUser.kakao_account?.profile?.profile_image_url ?? null;
-    const existing = await prisma.profile.findFirst({ where: { nickname: name } });
-    const nickname = existing ? `${name}_${Math.floor(1000 + Math.random() * 9000)}` : name;
-    await prisma.profile.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, nickname, imageUrl, gender: 'MALE' },
-    });
+    await createDefaultProfile(user.id, name, imageUrl);
   }
 
   const newAccessToken = signAccessToken({ userId: user.id });
@@ -112,13 +133,7 @@ export const googleLogin = async (idToken: string): Promise<SocialLoginResult> =
   // 신규 유저 기본 프로필 생성
   if (isNewUser) {
     const imageUrl = googleUser.picture ?? null;
-    const existing = await prisma.profile.findFirst({ where: { nickname: name } });
-    const nickname = existing ? `${name}_${Math.floor(1000 + Math.random() * 9000)}` : name;
-    await prisma.profile.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, nickname, imageUrl, gender: 'MALE' },
-    });
+    await createDefaultProfile(user.id, name, imageUrl);
   }
 
   const newAccessToken = signAccessToken({ userId: user.id });

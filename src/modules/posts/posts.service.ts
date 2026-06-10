@@ -20,6 +20,7 @@ export const getPostsService = async (query: GetPostsQuery, userId: string) => {
 
   const results = await prisma.post.findMany({
     where: {
+      deletedAt: null,
       user: {
         ...(follow && {
           followers: {
@@ -80,7 +81,7 @@ export const getPostsService = async (query: GetPostsQuery, userId: string) => {
   const items = results.map((item) => ({
       id: item.id,
       nickname: item.user.profile?.nickname ?? null,
-      imageUrl: item.closetArchive.imageUrl,
+      imageUrl: item.closetArchive?.imageUrl ?? null,
       likeCount: item._count.postLikes,
       isLiked: item.postLikes.length > 0,
       bookmarkCount: item._count.postBookmarks,
@@ -92,8 +93,8 @@ export const getPostsService = async (query: GetPostsQuery, userId: string) => {
 
 // 게시글 상세 조회
 export const getPostByIdService = async (id: string, userId: string) => {
-  const post = await prisma.post.findUnique({
-    where: { id },
+  const post = await prisma.post.findFirst({
+    where: { id, deletedAt: null },
     select: {
       id: true,
       createdAt: true,
@@ -156,7 +157,7 @@ export const getPostByIdService = async (id: string, userId: string) => {
   await prisma.postView.deleteMany({ where: { userId, postId: id } });
   await prisma.postView.create({ data: { userId, postId: id } });
 
-  const bodyInfo = post.closetArchive.bodyInfo as { height?: number; weight?: number } | null;
+  const bodyInfo = post.closetArchive?.bodyInfo as { height?: number; weight?: number } | null;
 
   return {
     id: post.id,
@@ -169,24 +170,24 @@ export const getPostByIdService = async (id: string, userId: string) => {
       weight: bodyInfo?.weight ?? null,
       isFollowing: post.user.followers.length > 0,
     },
-    image2dUrl: post.closetArchive.imageUrl,
-    model3dUrl: post.closetArchive.modelUrl,
+    image2dUrl: post.closetArchive?.imageUrl ?? null,
+    model3dUrl: post.closetArchive?.modelUrl ?? null,
     images: post.postImages.map((img) => img.imageUrl),
     likeCount: post._count.postLikes,
     isLiked: post.postLikes.length > 0,
     bookmarkCount: post._count.postBookmarks,
     isBookmarked: post.postBookmarks.length > 0,
-    items: post.closetArchive.closetItems.map((it) => ({
+    items: post.closetArchive?.closetItems.map((it) => ({
       imageUrl: it.imageUrl,
       brand: it.brand,
       name: it.name,
       size: it.size,
       link: it.externalLink,
       type: it.type,
-    })),
+    })) ?? [],
     otherPosts: post.user.posts.map((p) => ({
       id: p.id,
-      imageUrl: p.closetArchive.imageUrl,
+      imageUrl: p.closetArchive?.imageUrl ?? null,
       likeCount: p._count.postLikes,
       isLiked: p.postLikes.length > 0,
     })),

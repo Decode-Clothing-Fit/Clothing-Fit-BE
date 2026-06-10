@@ -133,12 +133,12 @@ model ClosetItem {
 model Post {
   id               String    @id @db.Uuid @default(uuid())
   userId           String    @map("user_id") @db.Uuid
-  closetArchiveId  String    @unique @map("closet_archive_id") @db.Uuid
+  closetArchiveId  String?   @unique @map("closet_archive_id") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at")
   deletedAt        DateTime? @map("deleted_at")
 
-  user          User          @relation(fields: [userId], references: [id])
-  closetArchive ClosetArchive @relation(fields: [closetArchiveId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
+  closetArchive ClosetArchive? @relation(fields: [closetArchiveId], references: [id])
   postImages    PostImage[]
   postViews     PostView[]
   postLikes     PostLike[]
@@ -154,7 +154,7 @@ model PostImage {
   order     Int
   createdAt DateTime @default(now()) @map("created_at")
 
-  post Post @relation(fields: [postId], references: [id])
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@map("post_images")
 }
@@ -166,7 +166,7 @@ model PostView {
   createdAt DateTime @default(now()) @map("viewed_at")
 
   user User @relation(fields: [userId], references: [id])
-  post Post @relation(fields: [postId], references: [id])
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@map("post_views")
 }

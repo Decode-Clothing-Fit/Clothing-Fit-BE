@@ -133,12 +133,12 @@ export const deleteCloset = async (userId: string, closetArchiveId: string): Pro
     where: { id: closetArchiveId },
     select: {
       userId: true,
-      post: { select: { id: true }}
-    }
-  })
+      post: { select: { id: true } },
+    },
+  });
 
   if (!archive) {
-    throw new AppError(ErrorCode.CLOSET_NOT_FOUND, ' 존재하지 않는 옷장입니다.', StatusCodes.NOT_FOUND)
+    throw new AppError(ErrorCode.CLOSET_NOT_FOUND, '존재하지 않는 옷장입니다.', StatusCodes.NOT_FOUND);
   }
 
   if (archive.userId !== userId) {
@@ -146,18 +146,20 @@ export const deleteCloset = async (userId: string, closetArchiveId: string): Pro
   }
 
   if (archive.post) {
-    await prisma.post.delete({ where: {
-      id:archive.post.id
-    }})
+    const postId = archive.post.id;
+    // 연관 데이터 하드딜리트 (법적 기록 불필요)
+    await prisma.postView.deleteMany({ where: { postId } });
+    await prisma.postLike.deleteMany({ where: { postId } });
+    await prisma.postBookmark.deleteMany({ where: { postId } });
+    // 게시글 소프트딜리트 + closetArchiveId null (법적 기록 보존, FK 참조 해제)
+    await prisma.post.update({
+      where: { id: postId },
+      data: { deletedAt: new Date(), closetArchiveId: null },
+    });
   }
 
-  await prisma.closetItem.deleteMany({
-    where: { closetArchiveId }
-  })
-
-  await prisma.closetArchive.delete({
-    where: { id: closetArchiveId }
-  })
+  await prisma.closetItem.deleteMany({ where: { closetArchiveId } });
+  await prisma.closetArchive.delete({ where: { id: closetArchiveId } });
 }
 
 export const publishCloset = async (userId: string, closetArchiveId: string): Promise<void> => {

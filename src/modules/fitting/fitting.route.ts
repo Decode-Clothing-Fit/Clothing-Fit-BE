@@ -14,12 +14,14 @@ import {
     SessionIdParamSchema,
     FittingTitleParamSchema,
     FittingTitleBodySchema,
+    MAX_COORDI_ITEMS,
 } from './fitting.schema';
 
 const router: RouterType = Router();
 
 // 2d 코디 생성 api (의류 이미지 최대 5개, 필드명은 meta.items[].imageField로 지정)
-router.post('/2d', authenticate, anyImageUpload(), generateCoordiController);
+// maxFileCount로 개수 상한을 강제해 초과 파일이 메모리에 적재되는 것을 막는다(DoS 방지).
+router.post('/2d', authenticate, anyImageUpload({ maxFileCount: MAX_COORDI_ITEMS }), generateCoordiController);
 
 // 3d 생성 api
 router.post('/3d', authenticate, validate({ body: Fitting3DRequestSchema }), start3DFittingController);

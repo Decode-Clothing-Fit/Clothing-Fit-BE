@@ -25,13 +25,18 @@ type AnyImageOptions = {
     allowedMime?: string[];
     /** 최소 1개 파일을 요구할지. 기본 true (전부 없으면 400) */
     requireAtLeastOne?: boolean;
+    /** 허용 최대 파일 개수. 초과분이 메모리에 적재되기 전에 multer가 거부한다. */
+    maxFileCount?: number;
 };
 
-/** memoryStorage + MIME 화이트리스트 + 용량 제한이 적용된 multer 인스턴스를 만든다. */
-function createUploader(maxSizeBytes: number, allowedMime: string[]) {
+/**
+ * memoryStorage + MIME 화이트리스트 + 용량 제한이 적용된 multer 인스턴스를 만든다.
+ * maxFiles를 주면 파일 개수 상한을 강제해, 초과 파일이 메모리에 쌓이기 전에 차단한다(DoS 방지).
+ */
+function createUploader(maxSizeBytes: number, allowedMime: string[], maxFiles?: number) {
     return multer({
         storage: multer.memoryStorage(),
-        limits: { fileSize: maxSizeBytes },
+        limits: { fileSize: maxSizeBytes, ...(maxFiles !== undefined ? { files: maxFiles } : {}) },
         fileFilter: (_, file, cb) => {
             if (allowedMime.includes(file.mimetype)) {
                 cb(null, true);
@@ -49,6 +54,9 @@ function toUploadError(err: unknown, maxSizeBytes: number): AppError {
         if (err.code === 'LIMIT_FILE_SIZE') {
             const maxMb = Math.floor(maxSizeBytes / (1024 * 1024));
             return new AppError(ErrorCode.FILE_TOO_LARGE, `이미지는 ${maxMb}MB 이하여야 합니다.`, StatusCodes.REQUEST_TOO_LONG);
+        }
+        if (err.code === 'LIMIT_FILE_COUNT') {
+            return new AppError(ErrorCode.TOO_MANY_FILES, '업로드 가능한 파일 개수를 초과했습니다.', StatusCodes.BAD_REQUEST);
         }
         return new AppError(ErrorCode.INVALID_FILE_TYPE, '파일 업로드에 실패했습니다.', StatusCodes.BAD_REQUEST);
     }
@@ -84,8 +92,8 @@ export const singleImageUpload = (options: ImageUploadOptions) => {
  * (필드명이 메타데이터에서 참조되는 경우 등에 사용)
  */
 export const anyImageUpload = (options: AnyImageOptions = {}) => {
-    const { maxSizeBytes = DEFAULT_MAX_SIZE, allowedMime = DEFAULT_ALLOWED_MIME, requireAtLeastOne = true } = options;
-    const upload = createUploader(maxSizeBytes, allowedMime);
+    const { maxSizeBytes = DEFAULT_MAX_SIZE, allowedMime = DEFAULT_ALLOWED_MIME, requireAtLeastOne = true, maxFileCount } = options;
+    const upload = createUploader(maxSizeBytes, allowedMime, maxFileCount);
 
     return (req: Request, res: Response, next: NextFunction): void => {
         upload.any()(req, res, (err: unknown) => {

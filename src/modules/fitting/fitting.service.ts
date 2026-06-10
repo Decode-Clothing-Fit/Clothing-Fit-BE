@@ -9,7 +9,7 @@ import { ErrorCode } from '@/common/errors/error-code';
 import prisma from '@/lib/prisma/extensions';
 import { uploadFittingModel, deleteFittingModel } from '@/lib/storage/fitting-model';
 import { uploadClosetImage, deleteClosetImage } from '@/lib/storage/closet-image';
-import { fittingStore, type FittingSession } from './fitting.store';
+import { fittingStore, type FittingSession, type CoordiResult } from './fitting.store';
 import type { CoordiMeasurements } from './fitting.schema';
 import { CATEGORY_LABEL, CATEGORY_EN, buildCoordiPrompt, buildOutfitNamePrompt, parseOutfitName } from './fitting.prompt';
 import { createFitCompleteNotification } from '../notifications/notifications.service';
@@ -217,11 +217,13 @@ async function pollMeshStatus(sessionId: string): Promise<void> {
             fittingStore.setSession(sessionId, session);
             releaseSlot(sessionId);
 
+            // 알림 실패가 피팅 성공에 영향을 주지 않도록 fire-and-forget 하되, reject는 반드시 삼켜
+            // unhandledRejection으로 프로세스가 죽지 않게 한다.
             createFitCompleteNotification({
                 receiverId: session.userId,
                 dimension: '3D',
-                closetArchiveId: session.closetArchiveId
-            })
+                closetArchiveId: session.closetArchiveId,
+            }).catch((err) => console.error(`[Fitting] 완료 알림 생성 실패 (${sessionId}):`, err));
         } else if (meshData.status === 'FAILED' || meshData.status === 'EXPIRED') {
             session.status = 'FAILED';
             fittingStore.setSession(sessionId, session);
@@ -414,23 +416,75 @@ function garmentDisplayName(g: CoordiGarment): string {
 }
 
 const AVATAR_FETCH_TIMEOUT_MS = 10_000; // 아바타 이미지가 무응답일 때 무한 대기 방지
+const MAX_COORDI_PER_USER = 1; // 사용자당 동시 2D 코디 생성 수 (비용·메모리 폭증 방지)
+const COORDI_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000; // 멱등성 키 보관 시간 (중복 제출 차단/결과 재반환)
 const RESIZE_MAX_DIMENSION = 1024; // 의류 디테일(패턴·로고) 보존을 위해 입력 해상도 상향
+// 색 틀어짐을 최소화하기 위해 고품질(q95)로 인코딩한다. (무손실 PNG는 사진 의류 이미지에서 용량이 과해 메모리 부담↑)
+const RESIZE_JPEG_QUALITY = 95;
 
-/**
- * 업로드 이미지를 멀티모달 요청에 적합한 크기로 줄여 base64로 변환한다.
- * 색이 임의로 틀어지는 것을 막기 위해 JPEG 재압축 대신 무손실 PNG로 인코딩한다.
- */
+/** 업로드 이미지를 멀티모달 요청에 적합한 크기로 줄여 base64로 변환한다. */
 async function toResizedBase64(buffer: Buffer): Promise<string> {
     return (
         await sharp(buffer)
             .resize(RESIZE_MAX_DIMENSION, RESIZE_MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
-            .png()
+            .jpeg({ quality: RESIZE_JPEG_QUALITY })
+            .toBuffer()
+    ).toString('base64');
+}
+
+// 의류 콘택트시트 레이아웃. 입력 이미지 "장수"가 늘수록 Gemini 생성이 급격히 느려져(=타임아웃),
+// 의류를 라벨 붙인 한 장의 시트로 합쳐 항상 (인물 1 + 시트 1) = 2장만 보낸다.
+const SHEET_CELL = 512; // 셀(의류 1칸) 한 변
+const SHEET_LABEL_H = 56; // 셀 상단 라벨 띠 높이
+const SHEET_MAX_COLS = 3; // 최대 열 수
+
+/** 의류 이미지들을 카테고리 라벨이 붙은 그리드 한 장(JPEG base64)으로 합성한다. */
+async function buildGarmentSheetBase64(garments: CoordiGarment[]): Promise<string> {
+    const cols = Math.min(garments.length, SHEET_MAX_COLS);
+    const rows = Math.ceil(garments.length / cols);
+    const cellH = SHEET_CELL + SHEET_LABEL_H;
+
+    // 각 셀: 상단 라벨 띠(SVG) + 흰 배경에 맞춘 의류 이미지
+    const cells = await Promise.all(
+        garments.map(async (g, i) => {
+            const label = `${i + 1}. ${CATEGORY_EN[g.category]}`;
+            const labelSvg = Buffer.from(
+                `<svg width="${SHEET_CELL}" height="${SHEET_LABEL_H}">` +
+                    `<rect width="100%" height="100%" fill="#eeeeee"/>` +
+                    `<text x="${SHEET_CELL / 2}" y="${SHEET_LABEL_H / 2}" dy="0.35em" text-anchor="middle" ` +
+                    `font-family="sans-serif" font-size="30" font-weight="bold" fill="#000">${label}</text></svg>`,
+            );
+            const garmentImg = await sharp(g.image.buffer)
+                .resize(SHEET_CELL, SHEET_CELL, { fit: 'contain', background: '#ffffff' })
+                .flatten({ background: '#ffffff' })
+                .toBuffer();
+            return sharp({ create: { width: SHEET_CELL, height: cellH, channels: 3, background: '#ffffff' } })
+                .composite([
+                    { input: labelSvg, top: 0, left: 0 },
+                    { input: garmentImg, top: SHEET_LABEL_H, left: 0 },
+                ])
+                .png()
+                .toBuffer();
+        }),
+    );
+
+    const composites = cells.map((input, i) => ({
+        input,
+        left: (i % cols) * SHEET_CELL,
+        top: Math.floor(i / cols) * cellH,
+    }));
+
+    return (
+        await sharp({ create: { width: cols * SHEET_CELL, height: rows * cellH, channels: 3, background: '#ffffff' } })
+            .composite(composites)
+            .jpeg({ quality: RESIZE_JPEG_QUALITY })
             .toBuffer()
     ).toString('base64');
 }
 
 type CoordiContext = {
     avatarUrl: string;
+    isUploadedImage: boolean; // true면 사용자가 올린 실제 사진, false면 프리셋 캐릭터(얼굴 없는 아바타)
     gender: string;
     height: number | null;
     weight: number | null;
@@ -464,7 +518,10 @@ async function loadCoordiContext(userId: string): Promise<CoordiContext> {
         prisma.profile.findUnique({ where: { userId }, select: { gender: true } }),
     ]);
 
-    const avatarUrl = userCharacter?.imageUrl ?? userCharacter?.character?.imageUrl;
+    // UPLOAD면 userCharacter.imageUrl(사용자 사진), CHARACTER면 character.imageUrl(프리셋 아바타).
+    // 실제로 어떤 이미지를 보내는지와 정확히 일치하도록, 업로드 URL 존재 여부로 소스를 판별한다.
+    const uploadedUrl = userCharacter?.imageUrl ?? null;
+    const avatarUrl = uploadedUrl ?? userCharacter?.character?.imageUrl;
     if (!avatarUrl) {
         throw new AppError(ErrorCode.FITTING_FAILED, '아바타 정보가 없습니다.', StatusCodes.NOT_FOUND);
     }
@@ -476,6 +533,7 @@ async function loadCoordiContext(userId: string): Promise<CoordiContext> {
 
     return {
         avatarUrl,
+        isUploadedImage: uploadedUrl !== null,
         gender: profile?.gender ?? '미제공',
         height: bodyInfo?.height ?? null,
         weight: bodyInfo?.weight ?? null,
@@ -483,8 +541,42 @@ async function loadCoordiContext(userId: string): Promise<CoordiContext> {
     };
 }
 
-/** 아바타(타임아웃 fetch)와 의류 이미지를 리사이즈해 Gemini 멀티모달 parts를 만든다. */
-async function buildCoordiParts(avatarUrl: string, garments: CoordiGarment[], prompt: string): Promise<object[]> {
+// Gemini 이미지 모델이 지원하는 출력 종횡비 [라벨, 가로/세로 값].
+const SUPPORTED_ASPECT_RATIOS: Array<[string, number]> = [
+    ['9:16', 9 / 16],
+    ['2:3', 2 / 3],
+    ['3:4', 3 / 4],
+    ['1:1', 1],
+    ['4:3', 4 / 3],
+    ['3:2', 3 / 2],
+    ['16:9', 16 / 9],
+    ['21:9', 21 / 9],
+];
+
+/** 입력 이미지 비율에 가장 가까운 지원 종횡비를 고른다. (출력이 원본과 다른 비율로 잘리는 것 방지) */
+function nearestAspectRatio(width: number, height: number): string {
+    const ratio = width / height;
+    let best = SUPPORTED_ASPECT_RATIOS[0];
+    let bestDiff = Infinity;
+    for (const entry of SUPPORTED_ASPECT_RATIOS) {
+        const diff = Math.abs(Math.log(ratio / entry[1])); // 비율은 로그 스케일로 비교해야 비례적으로 가까운 값이 선택됨
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            best = entry;
+        }
+    }
+    return best[0];
+}
+
+/**
+ * 아바타(타임아웃 fetch)와 의류 시트를 리사이즈해 Gemini 멀티모달 parts를 만든다.
+ * 인물 사진 비율에 맞춘 출력 종횡비(aspectRatio)도 함께 반환해 결과가 잘리지 않게 한다.
+ */
+async function buildCoordiParts(
+    avatarUrl: string,
+    garments: CoordiGarment[],
+    prompt: string,
+): Promise<{ parts: object[]; aspectRatio: string }> {
     let avatarResponse: Response;
     try {
         avatarResponse = await fetch(avatarUrl, { signal: AbortSignal.timeout(AVATAR_FETCH_TIMEOUT_MS) });
@@ -500,26 +592,32 @@ async function buildCoordiParts(avatarUrl: string, garments: CoordiGarment[], pr
         throw new AppError(ErrorCode.FITTING_FAILED, '아바타 이미지를 불러올 수 없습니다.', StatusCodes.BAD_GATEWAY);
     }
 
-    const [avatarData, garmentData] = await Promise.all([
-        toResizedBase64(Buffer.from(await avatarResponse.arrayBuffer())),
-        Promise.all(garments.map((g) => toResizedBase64(g.image.buffer))),
+    // 인물 1장 + 의류 전체를 합친 콘택트시트 1장만 보낸다 (입력 장수 고정 → 생성 지연/타임아웃 방지)
+    const avatarBuffer = Buffer.from(await avatarResponse.arrayBuffer());
+    const meta = await sharp(avatarBuffer).metadata();
+    const aspectRatio = nearestAspectRatio(meta.width ?? 1, meta.height ?? 1);
+
+    const [avatarData, garmentSheet] = await Promise.all([
+        toResizedBase64(avatarBuffer),
+        buildGarmentSheetBase64(garments),
     ]);
 
-    return [
-        { text: 'Image 1 — avatar:' },
-        { inlineData: { mimeType: 'image/png', data: avatarData } },
-        ...garments.flatMap((g, i) => [
-            { text: `Image ${i + 2} — ${CATEGORY_EN[g.category]}:` },
-            { inlineData: { mimeType: 'image/png', data: garmentData[i] } },
-        ]),
-        { text: prompt },
-    ];
+    return {
+        parts: [
+            { text: 'Image 1 — subject:' },
+            { inlineData: { mimeType: 'image/jpeg', data: avatarData } },
+            { text: 'Image 2 — garment contact sheet (each labeled cell is one garment to put on the subject):' },
+            { inlineData: { mimeType: 'image/jpeg', data: garmentSheet } },
+            { text: prompt },
+        ],
+        aspectRatio,
+    };
 }
 
 /** Gemini 이미지 생성 호출. 전송 디테일은 lib/ai/gemini가 담당하고, 여기서는 실패 reason을 HTTP 상태로 매핑한다. */
-async function runGemini(parts: object[]): Promise<{ data: string; mimeType: string }> {
+async function runGemini(parts: object[], aspectRatio?: string): Promise<{ data: string; mimeType: string }> {
     try {
-        return await generateMultimodalImage(parts);
+        return await generateMultimodalImage(parts, aspectRatio);
     } catch (err) {
         if (err instanceof GeminiApiError && err.reason === 'TIMEOUT') {
             throw new AppError(ErrorCode.GEMINI_API_ERROR, 'Gemini 응답 타임아웃', StatusCodes.GATEWAY_TIMEOUT);
@@ -617,18 +715,10 @@ async function persistCoordi(
 }
 
 /**
- * 2D 코디 이미지를 생성하고 옷장 아카이브에 저장한다.
- * 검증 → 컨텍스트 조회 → 프롬프트/파트 구성 → Gemini 생성 → S3 업로드 → DB 저장.
- * 각 단계의 디테일(타임아웃/보상삭제/HTTP 매핑)은 헬퍼가 담당한다.
- * @param userId
- * @param garments  카테고리 순서로 들어오는 의류(이미지 + 치수 + 상품 정보). 최대 5개.
+ * 코디 생성 본체. 검증 → 컨텍스트 조회 → 프롬프트/파트 구성 → Gemini 생성 → S3 업로드 → DB 저장.
+ * 동시성·멱등성 제어는 호출부(generateCoordi)가 담당하고, 여기서는 순수 처리 흐름만 둔다.
  */
-export const generateCoordi = async (
-    userId: string,
-    garments: CoordiGarment[],
-): Promise<{ closetArchiveId: string; imageUrl: string; outfitName: string }> => {
-    validateGarments(garments);
-
+async function runCoordiGeneration(userId: string, garments: CoordiGarment[]): Promise<CoordiResult> {
     const ctx = await loadCoordiContext(userId);
 
     const prompt = buildCoordiPrompt({
@@ -637,14 +727,17 @@ export const generateCoordi = async (
         weight: ctx.weight,
         bodyMeasurements: ctx.dbMeasurements,
         garments,
+        isUploadedImage: ctx.isUploadedImage,
     });
-    const parts = await buildCoordiParts(ctx.avatarUrl, garments, prompt);
+    const { parts, aspectRatio } = await buildCoordiParts(ctx.avatarUrl, garments, prompt);
 
     // 이미지(image 모델)와 코디명(text 모델)을 분리·병렬 실행. 코디명은 실패해도 기본값으로 폴백된다.
+    const geminiStartedAt = Date.now();
     const [generated, outfitName] = await Promise.all([
-        runGemini(parts),
+        runGemini(parts, aspectRatio),
         generateOutfitName(garments),
     ]);
+    const geminiMs = Date.now() - geminiStartedAt;
 
     const coordiBuffer = Buffer.from(generated.data, 'base64');
     const coordiContentType = generated.mimeType.startsWith('image/') ? generated.mimeType : 'image/png';
@@ -659,5 +752,62 @@ export const generateCoordi = async (
         garments,
     });
 
+    // #6 관측: Gemini 호출 지연을 분리해 기록 (지연 원인 진단용)
+    console.log('[Coordi] Gemini 생성 완료', { userId, garmentCount: garments.length, geminiMs });
+
     return { closetArchiveId, imageUrl: coordiImageUrl, outfitName };
+}
+
+/**
+ * 2D 코디 이미지를 생성하고 옷장 아카이브에 저장한다.
+ * 사용자당 동시 생성 수를 제한(#1)하고, Idempotency-Key로 중복 제출을 차단(#4)하며,
+ * 처리 시간·결과를 구조화 로깅(#6)한다. 실제 생성 흐름은 runCoordiGeneration이 담당한다.
+ * @param userId
+ * @param garments  카테고리 순서로 들어오는 의류(이미지 + 치수 + 상품 정보). 최대 5개.
+ * @param idempotencyKey  선택. 동일 키 재요청 시 진행 중이면 409, 완료됐으면 캐시된 결과를 반환.
+ */
+export const generateCoordi = async (
+    userId: string,
+    garments: CoordiGarment[],
+    idempotencyKey?: string,
+): Promise<CoordiResult> => {
+    validateGarments(garments); // 카운터 선점 전에 저렴한 검증부터 (400 빠른 실패)
+
+    const idemKey = idempotencyKey ? `${userId}:${idempotencyKey}` : null;
+
+    // #4 멱등성: 동일 키 재요청 처리 (만료 전 레코드만 유효)
+    if (idemKey) {
+        const existing = fittingStore.getIdempotency(idemKey);
+        if (existing && existing.expiresAt > Date.now()) {
+            if (existing.status === 'done') return existing.result; // 완료된 결과 재반환
+            throw new AppError(ErrorCode.FITTING_IN_PROGRESS, '동일한 요청이 이미 처리 중입니다.', StatusCodes.CONFLICT);
+        }
+    }
+
+    // #1 사용자당 동시 2D 생성 제한 (await 이전에 선점)
+    if (fittingStore.getCoordiCount(userId) >= MAX_COORDI_PER_USER) {
+        throw new AppError(ErrorCode.FITTING_IN_PROGRESS, '이미 진행 중인 코디 생성이 있습니다.', StatusCodes.CONFLICT);
+    }
+    fittingStore.incrementCoordiCount(userId);
+
+    const idemExpiresAt = Date.now() + COORDI_IDEMPOTENCY_TTL_MS;
+    if (idemKey) {
+        fittingStore.setIdempotency(idemKey, { status: 'pending', expiresAt: idemExpiresAt });
+        setTimeout(() => fittingStore.deleteIdempotency(idemKey), COORDI_IDEMPOTENCY_TTL_MS);
+    }
+
+    const startedAt = Date.now();
+    try {
+        const result = await runCoordiGeneration(userId, garments);
+        if (idemKey) fittingStore.setIdempotency(idemKey, { status: 'done', result, expiresAt: idemExpiresAt });
+        console.log('[Coordi] 생성 성공', { userId, garmentCount: garments.length, durationMs: Date.now() - startedAt });
+        return result;
+    } catch (err) {
+        // 실패 시 pending 제거 → 클라이언트가 같은 키로 재시도 가능
+        if (idemKey) fittingStore.deleteIdempotency(idemKey);
+        console.error('[Coordi] 생성 실패', { userId, garmentCount: garments.length, durationMs: Date.now() - startedAt, error: err });
+        throw err;
+    } finally {
+        fittingStore.decrementCoordiCount(userId);
+    }
 };

@@ -6,6 +6,7 @@ import {
   updateNotificationSettingsBodySchema,
   notificationSettingsResponseSchema,
   notificationIdParamSchema,
+  registerDeviceTokenBodySchema,
 } from './notifications.schema';
 
 export const notificationRegistry = registry;
@@ -13,6 +14,30 @@ export const notificationRegistry = registry;
 const TAG = 'Notification';
 
 const security = [{ bearerAuth: [] }];
+
+notificationRegistry.registerPath({
+  method: 'post',
+  path: '/notifications/device-tokens',
+  tags: [TAG],
+  summary: '기기 푸시 토큰 등록',
+  description:
+    '푸시 알림 수신을 위한 Expo push token을 등록합니다. 같은 토큰 재등록 시 멱등하게 갱신되며, 한 유저가 여러 기기를 등록할 수 있습니다.',
+  security,
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: registerDeviceTokenBodySchema,
+        },
+      },
+    },
+  },
+  responses: {
+    204: { description: '등록 완료' },
+    400: { description: '잘못된 요청 본문' },
+    401: { description: '인증 실패' },
+  },
+});
 
 notificationRegistry.registerPath({
   method: 'get',

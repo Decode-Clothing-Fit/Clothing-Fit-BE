@@ -42,11 +42,12 @@ const SYSTEM_IDENTITY_CHARACTER =
 
 // 소스가 "사용자가 업로드한 실제 인물 사진"일 때의 정체성 규칙. → 새 생성이 아니라 원본을 그대로 두는 in-place 편집.
 const SYSTEM_IDENTITY_UPLOAD =
-    'Task: this is an IN-PLACE PHOTO EDIT of image 1, NOT a new image generation. ' +
-    'Image 1 is a real, uploaded photo of a person. Take image 1 as the canvas and change ONLY the clothing they wear, leaving everything else byte-for-byte as close to the original as possible. ' +
-    'Preserve the person EXACTLY — same face and facial features, identity, hair, skin tone, body shape, proportions, AND the exact same pose, body orientation, limb positions, camera angle, crop, framing, lighting, and background. ' +
-    'Never re-pose, rotate, re-frame, re-light, or replace the background. Do NOT stylize, cartoonify, beautify, slim, retouch, or turn the person into a featureless avatar/mannequin — they must remain the same photorealistic real person, instantly recognizable as image 1. ' +
-    'You may only change the worn garments, shoes, and accessories.';
+    'Task: this is an IN-PLACE OUTFIT SWAP on image 1, NOT a new image generation. ' +
+    'Image 1 is a real, uploaded photo of a person who is ALREADY wearing their own outfit. ' +
+    'You MUST take off ALL of the person\'s original clothing and dress them only in the image 2 garments instead — none of their original clothing may remain, and do not blend or layer over it. ' +
+    'For any essential category (top/bottom) not provided in image 2, put on a simple default garment so the person is never undressed. ' +
+    'Everything OTHER than the clothing must be preserved EXACTLY — same face and facial features, identity, hair, skin tone, body shape, proportions, AND the exact same pose, body orientation, limb positions, camera angle, crop, framing, lighting, and background. ' +
+    'Never re-pose, rotate, re-frame, re-light, or replace the background. Do NOT stylize, cartoonify, beautify, slim, retouch, or turn the person into a featureless avatar/mannequin — they must remain the same photorealistic real person, instantly recognizable as image 1.';
 
 /** 프롬프트 구성에 필요한 의류 정보 (이미지 등 I/O 필드는 제외). */
 export type PromptGarment = {
@@ -108,21 +109,38 @@ export function buildCoordiPrompt(params: {
           'and the SAME pose, stance, body orientation, limb positions, and camera angle/framing as image 1. ' +
           'Do NOT re-pose, rotate, or re-frame the avatar. Do NOT turn it into a real human, and do NOT restyle it as a generic store mannequin. ONLY change the clothing.';
 
+    // 안 고른(Null) 필수 의류(상의·하의)에 입힐 "기본 옷". 맨몸 방지 + 디폴트 일관성.
+    // TOP은 흰 티셔츠, BOTTOM은 청바지로 고정한다.
+    const provided = new Set(garments.map((g) => g.category));
+    const ESSENTIAL_DEFAULTS: Array<[ClothingType, string]> = [
+        ['TOP', 'a plain white crew-neck T-shirt'],
+        ['BOTTOM', 'plain blue denim jeans'],
+    ];
+    const missingDefaults = ESSENTIAL_DEFAULTS.filter(([c]) => !provided.has(c));
+    // "Top → a plain white crew-neck T-shirt; Bottom → plain blue denim jeans" 형태의 지시 문구
+    const missingDefaultsText = missingDefaults.map(([c, desc]) => `${CATEGORY_EN[c]} → ${desc}`).join('; ');
+
     // 요청·출력 항목을 소스별로 분기.
-    //  - 캐릭터: 전신 스튜디오 이미지를 새로 생성 (검은 베이스 레이어 제거 포함)
-    //  - 업로드: 원본 사진을 그대로 두고 옷만 교체하는 in-place 편집 (배경/구도/크롭 보존)
+    //  - 캐릭터: 전신 스튜디오 이미지를 새로 생성. 안 준 상의/하의는 심플한 기본 옷으로 채움 (맨몸 금지)
+    //  - 업로드: 원본 사진을 그대로 두고, 제공된 카테고리만 교체. 안 준 부위는 원래 입던 옷 유지
     const requests = isUploadedImage
         ? [
-              'Edit image 1 in place: keep the person, their face, hair, body, pose, the background, lighting, and the original crop/framing exactly as in image 1.',
+              'Take OFF all of the person\'s original clothing in image 1, then dress them in the garments from the image 2 contact sheet (matched by each cell\'s category label). None of their original clothing may remain.',
+              missingDefaults.length > 0
+                  ? `For any essential clothing category NOT provided in the sheet, dress the person in these exact defaults: ${missingDefaultsText}. The person must never end up undressed or with bare skin where clothing belongs.`
+                  : 'The person must never end up undressed or with bare skin where clothing belongs.',
+              'Naturally complete any other non-provided categories (e.g. shoes, outer) in a simple, unobtrusive way so the person is never barefoot or undressed.',
+              'Fit each garment naturally onto the body following the person\'s exact pose. Keep the background, lighting, crop, and framing of image 1 unchanged.',
               requestIdentity,
-              'Replace ONLY the clothing with the provided garments, fitting them naturally onto the body. Do not change anything else in the image.',
-              'Naturally complete any clothing categories that are not provided, matching the overall style.',
           ]
         : [
               'Generate a single full-body image of the avatar (image 1) wearing all the garments.',
               requestIdentity,
-              'Remove the black base layer (leggings/tights and tight top) the avatar wears in image 1; show the avatar\'s bare body surface where the provided garments do not cover.',
-              'Naturally complete any categories that are not provided.',
+              'Remove the black base layer (leggings/tights and tight top) the avatar wears in image 1.',
+              missingDefaults.length > 0
+                  ? `The avatar must end up FULLY DRESSED — never show bare skin on the torso or legs. For the essential clothing not provided, dress it in these exact defaults: ${missingDefaultsText}.`
+                  : 'The avatar must end up fully dressed — never show bare skin on the torso or legs.',
+              'Naturally complete any other categories that are not provided (e.g. shoes, outer) in a simple, unobtrusive way.',
               'Use a clean studio-style background.',
               'Frame the entire body from head to toe; do not crop the head.',
           ];
@@ -158,6 +176,13 @@ export function buildCoordiPrompt(params: {
         '[Output — VERY IMPORTANT]',
         ...outputLines,
         '',
+        // 업로드 사진은 "원래 옷 제거 + 시트 옷 착용"을 별도 CRITICAL로 한 번 더 못 박는다 (원본 옷이 남는 문제 방지)
+        ...(isUploadedImage
+            ? [
+                  'CRITICAL (outfit replacement): The person in image 1 is already dressed. You MUST remove ALL of that original outfit and replace it with the garments from the image 2 contact sheet (plus a simple default for any missing essential top/bottom). ' +
+                      'The result must show the person wearing ONLY those garments — do NOT keep, layer, blend, or leave ANY part of their original clothing visible. Applying the new garments is the whole point of the edit.',
+              ]
+            : []),
         criticalIdentity,
         'CRITICAL (garment fidelity): Each garment must look identical to its cell in the image 2 contact sheet — same color, pattern, print/logo, and shape. ' +
             'Do not alter, recolor, or redesign the garments, and ignore the sheet\'s white background and labels; only fit each garment naturally onto the body.',

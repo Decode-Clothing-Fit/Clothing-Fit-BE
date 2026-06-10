@@ -3,7 +3,7 @@ import { uuidv7 } from 'uuidv7';
 import { Prisma, type ClothingType } from '@prisma/client';
 import { StatusCodes } from 'http-status-codes';
 import { meshFetch, MeshApiError } from '@/lib/ai/mesh';
-import { generateMultimodalImage, generateText, GeminiApiError } from '@/lib/ai/gemini';
+import { generateMultimodalImage, generateText, GeminiApiError, type ImageGenOptions } from '@/lib/ai/gemini';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import prisma from '@/lib/prisma/extensions';
@@ -418,6 +418,8 @@ function garmentDisplayName(g: CoordiGarment): string {
 const AVATAR_FETCH_TIMEOUT_MS = 10_000; // 아바타 이미지가 무응답일 때 무한 대기 방지
 const MAX_COORDI_PER_USER = 1; // 사용자당 동시 2D 코디 생성 수 (비용·메모리 폭증 방지)
 const COORDI_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000; // 멱등성 키 보관 시간 (중복 제출 차단/결과 재반환)
+const COORDI_CHARACTER_TEMPERATURE = 0.2; // 캐릭터: 색/디테일 재해석 억제 (보존 우선)
+const COORDI_UPLOAD_TEMPERATURE = 0.4; // 업로드 사진: 원본 옷을 실제로 교체하도록 변형 자유도 부여
 const RESIZE_MAX_DIMENSION = 1024; // 의류 디테일(패턴·로고) 보존을 위해 입력 해상도 상향
 // 색 틀어짐을 최소화하기 위해 고품질(q95)로 인코딩한다. (무손실 PNG는 사진 의류 이미지에서 용량이 과해 메모리 부담↑)
 const RESIZE_JPEG_QUALITY = 95;
@@ -615,9 +617,9 @@ async function buildCoordiParts(
 }
 
 /** Gemini 이미지 생성 호출. 전송 디테일은 lib/ai/gemini가 담당하고, 여기서는 실패 reason을 HTTP 상태로 매핑한다. */
-async function runGemini(parts: object[], aspectRatio?: string): Promise<{ data: string; mimeType: string }> {
+async function runGemini(parts: object[], opts: ImageGenOptions): Promise<{ data: string; mimeType: string }> {
     try {
-        return await generateMultimodalImage(parts, aspectRatio);
+        return await generateMultimodalImage(parts, opts);
     } catch (err) {
         if (err instanceof GeminiApiError && err.reason === 'TIMEOUT') {
             throw new AppError(ErrorCode.GEMINI_API_ERROR, 'Gemini 응답 타임아웃', StatusCodes.GATEWAY_TIMEOUT);
@@ -731,10 +733,14 @@ async function runCoordiGeneration(userId: string, garments: CoordiGarment[]): P
     });
     const { parts, aspectRatio } = await buildCoordiParts(ctx.avatarUrl, garments, prompt);
 
+    // 업로드 사진은 "옷 교체"를 실제로 일으키려면 자유도(temperature)가 더 필요하다.
+    // 캐릭터는 색/디테일 보존을 위해 낮게 유지한다.
+    const temperature = ctx.isUploadedImage ? COORDI_UPLOAD_TEMPERATURE : COORDI_CHARACTER_TEMPERATURE;
+
     // 이미지(image 모델)와 코디명(text 모델)을 분리·병렬 실행. 코디명은 실패해도 기본값으로 폴백된다.
     const geminiStartedAt = Date.now();
     const [generated, outfitName] = await Promise.all([
-        runGemini(parts, aspectRatio),
+        runGemini(parts, { aspectRatio, temperature }),
         generateOutfitName(garments),
     ]);
     const geminiMs = Date.now() - geminiStartedAt;

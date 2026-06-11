@@ -20,6 +20,7 @@ export const getPostsService = async (query: GetPostsQuery, userId: string) => {
 
   const results = await prisma.post.findMany({
     where: {
+      deletedAt: null,
       user: {
         ...(follow && {
           followers: {
@@ -80,7 +81,7 @@ export const getPostsService = async (query: GetPostsQuery, userId: string) => {
   const items = results.map((item) => ({
       id: item.id,
       nickname: item.user.profile?.nickname ?? null,
-      imageUrl: item.closetArchive.imageUrl,
+      imageUrl: item.closetArchive?.imageUrl ?? null,
       likeCount: item._count.postLikes,
       isLiked: item.postLikes.length > 0,
       bookmarkCount: item._count.postBookmarks,
@@ -92,8 +93,8 @@ export const getPostsService = async (query: GetPostsQuery, userId: string) => {
 
 // 게시글 상세 조회
 export const getPostByIdService = async (id: string, userId: string) => {
-  const post = await prisma.post.findUnique({
-    where: { id },
+  const post = await prisma.post.findFirst({
+    where: { id, deletedAt: null },
     select: {
       id: true,
       createdAt: true,
@@ -152,11 +153,14 @@ export const getPostByIdService = async (id: string, userId: string) => {
 
   if (!post) throw new AppError(ErrorCode.POST_NOT_FOUND, '게시글이 존재하지 않습니다.', StatusCodes.NOT_FOUND);
 
-  // 최근 조회 기록 저장 (기존 기록 삭제 후 새로 추가 → 중복 없이 최신 순서 유지)
-  await prisma.postView.deleteMany({ where: { userId, postId: id } });
-  await prisma.postView.create({ data: { userId, postId: id } });
+  // 최근 조회 기록 저장 (upsert로 원자적 처리 → 동시 요청 시 race condition 방지)
+  await prisma.postView.upsert({
+    where: { userId_postId: { userId, postId: id } },
+    update: { createdAt: new Date() },
+    create: { userId, postId: id },
+  });
 
-  const bodyInfo = post.closetArchive.bodyInfo as { height?: number; weight?: number } | null;
+  const bodyInfo = post.closetArchive?.bodyInfo as { height?: number; weight?: number } | null;
 
   return {
     id: post.id,
@@ -169,28 +173,43 @@ export const getPostByIdService = async (id: string, userId: string) => {
       weight: bodyInfo?.weight ?? null,
       isFollowing: post.user.followers.length > 0,
     },
-    image2dUrl: post.closetArchive.imageUrl,
-    model3dUrl: post.closetArchive.modelUrl,
+    image2dUrl: post.closetArchive?.imageUrl ?? null,
+    model3dUrl: post.closetArchive?.modelUrl ?? null,
     images: post.postImages.map((img) => img.imageUrl),
     likeCount: post._count.postLikes,
     isLiked: post.postLikes.length > 0,
     bookmarkCount: post._count.postBookmarks,
     isBookmarked: post.postBookmarks.length > 0,
-    items: post.closetArchive.closetItems.map((it) => ({
+    items: post.closetArchive?.closetItems.map((it) => ({
       imageUrl: it.imageUrl,
       brand: it.brand,
       name: it.name,
       size: it.size,
       link: it.externalLink,
       type: it.type,
-    })),
+    })) ?? [],
     otherPosts: post.user.posts.map((p) => ({
       id: p.id,
-      imageUrl: p.closetArchive.imageUrl,
+      imageUrl: p.closetArchive?.imageUrl ?? null,
       likeCount: p._count.postLikes,
       isLiked: p.postLikes.length > 0,
     })),
   };
+};
+
+// 게시글 삭제 (소프트딜리트)
+export const deletePostService = async (id: string, userId: string): Promise<void> => {
+  const post = await prisma.post.findUnique({ where: { id } });
+
+  if (!post || post.deletedAt) {
+    throw new AppError(ErrorCode.POST_NOT_FOUND, '게시글이 존재하지 않습니다.', StatusCodes.NOT_FOUND);
+  }
+
+  if (post.userId !== userId) {
+    throw new AppError(ErrorCode.NOT_POST_OWNER, '게시글을 삭제할 권한이 없습니다.', StatusCodes.FORBIDDEN);
+  }
+
+  await prisma.post.update({ where: { id }, data: { deletedAt: new Date() } });
 };
 
 // 좋아요

@@ -2,6 +2,7 @@ import { type Router as RouterType, Router } from 'express';
 import {
   getPosts,
   getPostById,
+  deletePost,
   likePost,
   unlikePost,
   bookmarkPost,
@@ -19,6 +20,9 @@ router.get('/', validate({ query: getPostsQuerySchema }), authenticate, getPosts
 
 // 게시글 상세 조회
 router.get('/:id', validate({ params: postIdParamSchema }), authenticate, getPostById);
+
+// 게시글 삭제
+router.delete('/:id', validate({ params: postIdParamSchema }), authenticate, deletePost);
 
 // 좋아요
 router.post('/:id/like', validate({ params: postIdParamSchema }), authenticate, likePost);

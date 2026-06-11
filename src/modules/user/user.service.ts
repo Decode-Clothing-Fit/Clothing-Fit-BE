@@ -91,7 +91,7 @@ export const getUserPosts = async (
   const items = posts.map((post) => ({
     id: post.id,
     nickname: post.user.profile?.nickname ?? null,
-    imageUrl: post.closetArchive.imageUrl,
+    imageUrl: post.closetArchive?.imageUrl ?? null,
     likeCount: post._count.postLikes,
     isLiked: post.postLikes.length > 0,
     bookmarkCount: post._count.postBookmarks,

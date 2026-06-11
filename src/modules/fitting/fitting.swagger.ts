@@ -20,9 +20,11 @@ registry.registerPath({
     description:
         'multipart/form-data로 의류 이미지(최대 5개)와 `meta` JSON을 함께 보냅니다. ' +
         '`meta`는 `{ "items": [...] }` 형태이며, 각 item의 `imageField`가 함께 보낸 multipart 파일 필드명을 가리킵니다(예: image_top). ' +
-        '각 item은 category(소문자 가능), selectedMeasurements(선택 사이즈 기준 납작한 치수), selectedSize, title(상품명), sourceUrl(제품 링크), sizeTable/sizeTableSource를 가집니다. 체형은 보내지 않습니다. ' +
+        '각 item은 category(소문자 가능), selectedMeasurements(선택 사이즈 기준 납작한 치수), selectedSize, brand(브랜드명), name(상품명), sourceUrl(제품 링크), sizeTable/sizeTableSource를 가집니다. 체형은 보내지 않습니다. ' +
         '신체 치수·성별은 토큰의 user_id로 DB(body_info, profiles)에서, 아바타는 user_character에서 조회합니다. ' +
-        'Gemini 호출은 타임아웃(60초)과 1회 재시도를 적용하며, 생성된 코디 이미지와 코디명은 closet_archive(+의류별 closet_items)에 저장됩니다.',
+        'Gemini 이미지 생성은 타임아웃(180초)을 적용하며(타임아웃은 재시도하지 않음), 생성된 코디 이미지와 코디명은 closet_archive(+의류별 closet_items)에 저장됩니다. ' +
+        '사용자당 동시에 1건만 생성할 수 있으며, 진행 중에 다시 요청하면 409를 반환합니다. ' +
+        '`Idempotency-Key` 헤더(선택)를 보내면 중복 제출을 막습니다 — 같은 키가 처리 중이면 409, 이미 완료됐으면 저장된 결과(201)를 그대로 반환합니다(10분간 유효).',
     security: [{ bearerAuth: [] }],
     request: {
         body: {
@@ -49,6 +51,10 @@ registry.registerPath({
         },
         404: {
             description: '아바타 정보 없음',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
+        409: {
+            description: '이미 진행 중인 코디 생성이 있거나 동일 Idempotency-Key 요청이 처리 중',
             content: { 'application/json': { schema: ErrorResponseSchema } },
         },
         500: {

@@ -28,7 +28,17 @@ export const generateCoordiController = asyncHandler(async (req: Request, res: R
         throw new AppError(ErrorCode.VALIDATION_ERROR, 'meta 형식이 올바르지 않습니다.', StatusCodes.BAD_REQUEST);
     }
     const rawItems = Array.isArray(parsed) ? parsed : (parsed as { items?: unknown })?.items;
-    const items = CoordiItemsSchema.parse(rawItems);
+    // parse는 검증 실패 시 ZodError를 던진다. 그대로 두면 AppError가 아니라 500으로 떨어지므로,
+    // validate 미들웨어와 동일하게 400 VALIDATION_ERROR로 매핑한다.
+    const result = CoordiItemsSchema.safeParse(rawItems);
+    if (!result.success) {
+        throw new AppError(
+            ErrorCode.VALIDATION_ERROR,
+            result.error.errors[0]?.message ?? '의류 정보(meta)가 올바르지 않습니다.',
+            StatusCodes.BAD_REQUEST,
+        );
+    }
+    const items = result.data;
 
     // imageField로 multipart 파일을 매칭해 의류 조립 (요청 순서 유지)
     const fileByField = new Map(files.map((f) => [f.fieldname, f]));
@@ -53,7 +63,10 @@ export const generateCoordiController = asyncHandler(async (req: Request, res: R
         };
     });
 
-    const { closetArchiveId, imageUrl, outfitName } = await generateCoordi(userId, garments);
+    // 멱등성 키(선택): 동일 키 재요청 시 중복 생성 대신 진행 중 409 / 완료된 결과 재반환
+    const idempotencyKey = req.header('Idempotency-Key') || undefined;
+
+    const { closetArchiveId, imageUrl, outfitName } = await generateCoordi(userId, garments, idempotencyKey);
 
     res.status(StatusCodes.CREATED).json({ imageUrl, archiveId: closetArchiveId, outfitName });
 });

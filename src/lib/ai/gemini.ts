@@ -5,8 +5,8 @@ export const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 
 const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
 const GEMINI_TEXT_MODEL = 'gemini-2.5-flash';
-/** 멀티모달 이미지 생성 응답 타임아웃 (응답 없이 멈춘 요청이 무한 대기하지 않도록) */
-const GEMINI_TIMEOUT_MS = 60_000;
+/** 멀티모달 이미지 생성 응답 타임아웃 (응답 없이 멈춘 요청이 무한 대기하지 않도록). image-to-image 지연 편차가 커 180초로 둔다. */
+const GEMINI_TIMEOUT_MS = 180_000;
 /** 텍스트 생성 타임아웃 (코디명 등 가벼운 호출용) */
 const GEMINI_TEXT_TIMEOUT_MS = 15_000;
 /** 최초 1회 + 실패 시 재시도 2회. 이미지 모델이 간헐적으로 이미지 없이 응답하는 것에 대비 */
@@ -35,10 +35,21 @@ export type GeneratedImage = { data: string; mimeType: string };
  * 멀티모달 파트로 이미지 생성을 1회 호출하고, 타임아웃과 함께 이미지를 추출한다.
  * responseModalities를 IMAGE로 고정해 모델이 텍스트만 응답(이미지 누락)하는 것을 막는다.
  */
-async function generateImageOnce(parts: object[]): Promise<GeneratedImage> {
+/** 이미지 생성 호출 옵션. temperature/aspectRatio를 호출부(코디 소스 종류 등)에 따라 조절한다. */
+export type ImageGenOptions = { aspectRatio?: string; temperature?: number };
+
+const DEFAULT_IMAGE_TEMPERATURE = 0.2; // 색/디테일 재해석 억제 기본값
+
+async function generateImageOnce(parts: object[], opts: ImageGenOptions = {}): Promise<GeneratedImage> {
+    // 타임아웃 시 abort까지 걸어 실제 요청을 끊는다. (대기만 푸는 것을 넘어 SDK 내부 재시도/연결을 종료해
+    //  동일 입력에 대한 백그라운드 중복 호출이 쌓이는 것을 막는다)
+    const controller = new AbortController();
     let timer: NodeJS.Timeout | undefined;
     const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new GeminiApiError('TIMEOUT')), GEMINI_TIMEOUT_MS);
+        timer = setTimeout(() => {
+            controller.abort();
+            reject(new GeminiApiError('TIMEOUT'));
+        }, GEMINI_TIMEOUT_MS);
     });
 
     try {
@@ -46,9 +57,15 @@ async function generateImageOnce(parts: object[]): Promise<GeneratedImage> {
             gemini.models.generateContent({
                 model: GEMINI_IMAGE_MODEL,
                 contents: [{ role: 'user', parts }],
-                // temperature를 낮춰 모델이 원본 의류 색/디테일을 "재해석"하지 않고 충실히 재현하도록 한다.
-                // (기본 1.0에서는 매 호출마다 색을 임의로 조화·변형하는 경향이 있음)
-                config: { responseModalities: ['IMAGE'], temperature: 0.2 },
+                // temperature를 낮추면 색/디테일 재해석은 줄지만 입력을 너무 그대로 두는 경향도 있어,
+                // 호출부에서 소스에 맞게 조절한다(캐릭터=낮게/색보존, 업로드=조금 높게/옷 교체 자유도).
+                // aspectRatio를 주면 출력 비율을 입력(인물 사진)에 맞춰 잘림(crop)을 방지한다.
+                config: {
+                    responseModalities: ['IMAGE'],
+                    temperature: opts.temperature ?? DEFAULT_IMAGE_TEMPERATURE,
+                    abortSignal: controller.signal,
+                    ...(opts.aspectRatio ? { imageConfig: { aspectRatio: opts.aspectRatio } } : {}),
+                },
             }),
             timeout,
         ]);
@@ -81,17 +98,22 @@ async function generateImageOnce(parts: object[]): Promise<GeneratedImage> {
 
 /**
  * 멀티모달 파트(텍스트 + 이미지)로 이미지 1장을 생성한다.
- * 타임아웃과 재시도를 적용하며, 실패 시 GeminiApiError를 던진다. (HTTP 상태 매핑은 호출부 책임)
+ * 재시도는 "이미지 없이 응답(NO_IMAGE)"·일시적 요청 실패 대비용이며, 실패 시 GeminiApiError를 던진다.
+ * 단, TIMEOUT은 재시도하지 않는다 — 무거운 호출이 타임아웃마다 누적돼 부하·비용이 커지는 것을 막기 위함.
+ * (HTTP 상태 매핑은 호출부 책임)
  * @param parts  Gemini contents의 parts 배열 (text / inlineData 혼합)
+ * @param opts   출력 종횡비(aspectRatio)·temperature 등 호출 옵션
  */
-export const generateMultimodalImage = async (parts: object[]): Promise<GeneratedImage> => {
+export const generateMultimodalImage = async (parts: object[], opts: ImageGenOptions = {}): Promise<GeneratedImage> => {
     let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-            return await generateImageOnce(parts);
+            return await generateImageOnce(parts, opts);
         } catch (err) {
             lastError = err;
             console.error(`[Gemini] 이미지 생성 실패 (시도 ${attempt}/${MAX_ATTEMPTS}):`, err);
+            // 타임아웃은 즉시 실패 처리 (재시도 시 중복 호출 누적 방지)
+            if (err instanceof GeminiApiError && err.reason === 'TIMEOUT') break;
         }
     }
     throw lastError instanceof GeminiApiError ? lastError : new GeminiApiError('REQUEST_FAILED', lastError);
@@ -103,9 +125,14 @@ export const generateMultimodalImage = async (parts: object[]): Promise<Generate
  * @param prompt  생성 지시 텍스트
  */
 export const generateText = async (prompt: string): Promise<string> => {
+    // 타임아웃 시 실제 요청도 abort해 백그라운드 호출이 계속되지 않게 한다.
+    const controller = new AbortController();
     let timer: NodeJS.Timeout | undefined;
     const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new GeminiApiError('TIMEOUT')), GEMINI_TEXT_TIMEOUT_MS);
+        timer = setTimeout(() => {
+            controller.abort();
+            reject(new GeminiApiError('TIMEOUT'));
+        }, GEMINI_TEXT_TIMEOUT_MS);
     });
 
     try {
@@ -113,6 +140,7 @@ export const generateText = async (prompt: string): Promise<string> => {
             gemini.models.generateContent({
                 model: GEMINI_TEXT_MODEL,
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                config: { abortSignal: controller.signal },
             }),
             timeout,
         ]);

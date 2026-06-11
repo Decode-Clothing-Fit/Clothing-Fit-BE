@@ -109,7 +109,7 @@ export const getPostByIdService = async (id: string, userId: string) => {
             take: 1,
           },
           posts: {
-            where: { id: { not: id } },
+            where: { id: { not: id }, deletedAt: null },
             orderBy: { createdAt: 'desc' },
             take: 8,
             select: {

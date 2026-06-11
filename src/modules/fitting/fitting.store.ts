@@ -1,4 +1,15 @@
-// Redis 등으로 교체할 때 이 인터페이스만 구현하면 됩니다.
+// Redis 등으로 교체할 때 이 인터페이스를 구현하면 됩니다.
+//
+// ⚠️ 단, 멀티 인스턴스 전환 시 아래 메서드들을 "그대로" 구현하지 말 것:
+//   - getCoordiCount + incrementCoordiCount
+//   - getIdempotency + setIdempotency
+// 호출부(generateCoordi)가 read→write를 분리해 호출하므로 check-then-act 레이스가 있다.
+// 단일 프로세스(InMemory)에서는 두 호출 사이에 await가 없어 이벤트 루프상 원자적이라 안전하지만,
+// Redis/멀티 인스턴스에서는 각 호출이 별도 왕복이라 두 요청이 동시에 "빈 상태"를 읽고 둘 다 통과 →
+// 사용자당 1건 제한과 Idempotency 409/결과 재반환 계약이 깨지고 중복 생성·저장이 발생한다.
+// 전환 시에는 tryAcquireCoordiSlot / reserveIdempotency 같은 원자(compare-and-set) 연산
+// (SET NX PX, INCR+한도검사, Lua 스크립트 등)으로 경계를 올린 뒤 generateCoordi 호출부를 함께 바꿀 것.
+// (멱등성 예약 후 슬롯 획득 실패 시 예약 롤백 순서도 같이 처리해야 함)
 
 export type FittingStatus = 'QUEUED' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 

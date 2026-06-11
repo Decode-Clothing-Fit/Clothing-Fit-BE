@@ -6,6 +6,7 @@ import { meshFetch, MeshApiError } from '@/lib/ai/mesh';
 import { generateMultimodalImage, generateText, GeminiApiError, type ImageGenOptions } from '@/lib/ai/gemini';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
+import { logger } from '@/lib/logger/logger';
 import prisma from '@/lib/prisma/extensions';
 import { uploadFittingModel, deleteFittingModel } from '@/lib/storage/fitting-model';
 import { uploadClosetImage, deleteClosetImage } from '@/lib/storage/closet-image';
@@ -595,13 +596,25 @@ async function buildCoordiParts(
     }
 
     // 인물 1장 + 의류 전체를 합친 콘택트시트 1장만 보낸다 (입력 장수 고정 → 생성 지연/타임아웃 방지)
+    // 디코딩 실패는 소스별로 매핑한다: 아바타 원본은 우리 리소스 문제(502), 업로드 의류는 클라이언트 입력 문제(400).
     const avatarBuffer = Buffer.from(await avatarResponse.arrayBuffer());
-    const meta = await sharp(avatarBuffer).metadata();
+    const meta = await sharp(avatarBuffer)
+        .metadata()
+        .catch((err) => {
+            logger.warn('아바타 원본 디코딩 실패', { message: err instanceof Error ? err.message : String(err) });
+            throw new AppError(ErrorCode.FITTING_FAILED, '아바타 이미지를 처리할 수 없습니다.', StatusCodes.BAD_GATEWAY);
+        });
     const aspectRatio = nearestAspectRatio(meta.width ?? 1, meta.height ?? 1);
 
     const [avatarData, garmentSheet] = await Promise.all([
-        toResizedBase64(avatarBuffer),
-        buildGarmentSheetBase64(garments),
+        toResizedBase64(avatarBuffer).catch((err) => {
+            logger.warn('아바타 원본 리사이즈 실패', { message: err instanceof Error ? err.message : String(err) });
+            throw new AppError(ErrorCode.FITTING_FAILED, '아바타 이미지를 처리할 수 없습니다.', StatusCodes.BAD_GATEWAY);
+        }),
+        buildGarmentSheetBase64(garments).catch((err) => {
+            logger.warn('업로드 의류 이미지 처리 실패', { message: err instanceof Error ? err.message : String(err) });
+            throw new AppError(ErrorCode.VALIDATION_ERROR, '업로드한 의류 이미지를 처리할 수 없습니다.', StatusCodes.BAD_REQUEST);
+        }),
     ]);
 
     return {

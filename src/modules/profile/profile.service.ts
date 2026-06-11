@@ -2,7 +2,7 @@ import prisma from '@/lib/prisma/extensions';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { StatusCodes } from 'http-status-codes';
-import type { UpdateBodyInfoBody, UpdateNicknameBody, ProfilePostsQuery } from './profile.schema';
+import type { UpdateBodyInfoBody, UpdateGenderBody, UpdateNicknameBody, ProfilePostsQuery } from './profile.schema';
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client, S3_BUCKET } from '@/lib/storage/s3';
 import { v4 as uuidv4 } from 'uuid';
@@ -97,6 +97,14 @@ export const getBodyInfo = async (userId: string) => {
     footSize: measurements?.footSize ?? null,
   }
 }
+
+export const updateGender = async (userId: string, body: UpdateGenderBody): Promise<void> => {
+  await prisma.profile.upsert({
+    where: { userId },
+    update: { gender: body.gender },
+    create: { userId, gender: body.gender, nickname: `user_${userId}` },
+  });
+};
 
 export const updateBodyInfo = async (userId: string, body: UpdateBodyInfoBody): Promise<void> => {
   const { height, weight, chest, waist, hip, shoulder, head, footSize } = body;

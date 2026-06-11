@@ -65,6 +65,10 @@ registry.registerPath({
             description: 'Gemini 코디 생성 실패 (재시도 후) 또는 이미지 저장 실패',
             content: { 'application/json': { schema: ErrorResponseSchema } },
         },
+        503: {
+            description: 'AI 이미지 생성 모델 일시 과부하 (잠시 후 재시도)',
+            content: { 'application/json': { schema: ErrorResponseSchema } },
+        },
         504: {
             description: 'Gemini 응답 타임아웃',
             content: { 'application/json': { schema: ErrorResponseSchema } },

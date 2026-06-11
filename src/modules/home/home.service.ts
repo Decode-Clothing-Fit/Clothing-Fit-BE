@@ -44,12 +44,12 @@ export const getPopularPostsService = async (
   return posts.map((post) => ({
     postId: post.id,
     userId: post.user.id,
-    image: post.closetArchive.imageUrl,
+    image: post.closetArchive!.imageUrl,
     nickname: post.user.profile?.nickname ?? '',
     createdAt: post.createdAt.toISOString(),
     likeCount: post._count.postLikes,
     isLiked: post.postLikes.length > 0,
-    itemImages: post.closetArchive.closetItems
+    itemImages: post.closetArchive!.closetItems
       .map((item) => item.imageUrl)
       .filter((url): url is string => url !== null),
   }));
@@ -113,7 +113,7 @@ export const getRecommendedInfluencersService = async (
   return sorted.slice(0, 10).map((user) => ({
     userId: user.id,
     postId: user.posts[0].id,
-    postImage: user.posts[0].closetArchive.imageUrl,
+    postImage: user.posts[0].closetArchive!.imageUrl,
     profileImage: user.profile?.imageUrl ?? null,
     nickname: user.profile?.nickname ?? '',
     followerCount: user._count.followers,

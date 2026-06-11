@@ -209,7 +209,7 @@ export const deletePostService = async (id: string, userId: string): Promise<voi
     throw new AppError(ErrorCode.NOT_POST_OWNER, '게시글을 삭제할 권한이 없습니다.', StatusCodes.FORBIDDEN);
   }
 
-  await prisma.post.update({ where: { id }, data: { deletedAt: new Date() } });
+  await prisma.post.update({ where: { id }, data: { deletedAt: new Date(), closetArchiveId: null } });
 };
 
 // 좋아요

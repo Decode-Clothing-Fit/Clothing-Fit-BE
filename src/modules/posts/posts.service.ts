@@ -153,9 +153,12 @@ export const getPostByIdService = async (id: string, userId: string) => {
 
   if (!post) throw new AppError(ErrorCode.POST_NOT_FOUND, '게시글이 존재하지 않습니다.', StatusCodes.NOT_FOUND);
 
-  // 최근 조회 기록 저장 (기존 기록 삭제 후 새로 추가 → 중복 없이 최신 순서 유지)
-  await prisma.postView.deleteMany({ where: { userId, postId: id } });
-  await prisma.postView.create({ data: { userId, postId: id } });
+  // 최근 조회 기록 저장 (upsert로 원자적 처리 → 동시 요청 시 race condition 방지)
+  await prisma.postView.upsert({
+    where: { userId_postId: { userId, postId: id } },
+    update: { createdAt: new Date() },
+    create: { userId, postId: id },
+  });
 
   const bodyInfo = post.closetArchive?.bodyInfo as { height?: number; weight?: number } | null;
 

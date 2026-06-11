@@ -168,6 +168,7 @@ model PostView {
   user User @relation(fields: [userId], references: [id])
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, postId])
   @@map("post_views")
 }
 

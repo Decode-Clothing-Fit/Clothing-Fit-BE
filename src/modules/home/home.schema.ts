@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const popularPostSchema = z.object({
   postId: z.string().uuid(),
   userId: z.string().uuid(),
-  image: z.string().url(),
+  image: z.string().url().nullable(),
   nickname: z.string(),
   createdAt: z.string().datetime(),
   likeCount: z.number().int().nonnegative(),

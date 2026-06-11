@@ -54,7 +54,7 @@ model Profile {
   gender    Gender
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("profiles")
 }
@@ -68,7 +68,7 @@ model BodyInfo {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("body_info")
 }
@@ -92,7 +92,7 @@ model UserCharacter {
   imageUrl    String?         @map("image_url")
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
-  user      User       @relation(fields: [userId], references: [id])
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   character Character? @relation(fields: [characterId], references: [id])
 
   @@map("user_character")
@@ -107,7 +107,7 @@ model ClosetArchive {
   title     String
   createdAt DateTime @default(now()) @map("created_at")
 
-  user         User          @relation(fields: [userId], references: [id])
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   closetItems  ClosetItem[]
   post         Post?
 
@@ -125,19 +125,20 @@ model ClosetItem {
   size             String?
   createdAt        DateTime     @default(now()) @map("created_at")
 
-  closetArchive ClosetArchive @relation(fields: [closetArchiveId], references: [id])
+  closetArchive ClosetArchive @relation(fields: [closetArchiveId], references: [id], onDelete: Cascade)
 
   @@map("closet_items")
 }
 
 model Post {
-  id               String   @id @db.Uuid @default(uuid())
-  userId           String   @map("user_id") @db.Uuid
-  closetArchiveId  String   @unique @map("closet_archive_id") @db.Uuid
-  createdAt        DateTime @default(now()) @map("created_at")
+  id               String    @id @db.Uuid @default(uuid())
+  userId           String    @map("user_id") @db.Uuid
+  closetArchiveId  String?   @unique @map("closet_archive_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  deletedAt        DateTime? @map("deleted_at")
 
-  user          User          @relation(fields: [userId], references: [id])
-  closetArchive ClosetArchive @relation(fields: [closetArchiveId], references: [id])
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  closetArchive ClosetArchive? @relation(fields: [closetArchiveId], references: [id], onDelete: SetNull)
   postImages    PostImage[]
   postViews     PostView[]
   postLikes     PostLike[]
@@ -153,7 +154,7 @@ model PostImage {
   order     Int
   createdAt DateTime @default(now()) @map("created_at")
 
-  post Post @relation(fields: [postId], references: [id])
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@map("post_images")
 }
@@ -164,9 +165,10 @@ model PostView {
   postId    String   @map("post_id") @db.Uuid
   createdAt DateTime @default(now()) @map("viewed_at")
 
-  user User @relation(fields: [userId], references: [id])
-  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, postId])
   @@map("post_views")
 }
 
@@ -176,8 +178,8 @@ model PostLike {
   postId    String   @map("post_id") @db.Uuid
   createdAt DateTime @default(now()) @map("liked_at")
 
-  user User @relation(fields: [userId], references: [id])
-  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
   @@map("post_likes")
@@ -189,8 +191,8 @@ model PostBookmark {
   postId    String   @map("post_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id])
-  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
   @@map("post_bookmarks")
@@ -202,8 +204,8 @@ model Follow {
   followingId String   @map("following_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
 
-  follower  User @relation("Follower", fields: [followerId], references: [id])
-  following User @relation("Following", fields: [followingId], references: [id])
+  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingId])
   @@map("follows")
@@ -219,8 +221,8 @@ model Notification {
   isRead     Boolean                 @default(false) @map("is_read")
   createdAt  DateTime                @default(now()) @map("created_at")
 
-  receiver User  @relation("ReceivedNotifications", fields: [receiverId], references: [id])
-  actor    User? @relation("ActedNotifications", fields: [actorId], references: [id])
+  receiver User  @relation("ReceivedNotifications", fields: [receiverId], references: [id], onDelete: Cascade)
+  actor    User? @relation("ActedNotifications", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@map("notifications")
 }
@@ -231,7 +233,7 @@ model NotificationSetting {
   pushEnabled Boolean  @default(true) @map("push_enabled")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_settings")
 }

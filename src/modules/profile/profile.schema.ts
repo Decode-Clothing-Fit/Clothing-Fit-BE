@@ -50,6 +50,12 @@ export const updateBodyInfoSchema = z.object({
 
 export type UpdateBodyInfoBody = z.infer<typeof updateBodyInfoSchema>;
 
+export const updateGenderSchema = z.object({
+  gender: z.enum(['MALE', 'FEMALE'], { message: '성별은 MALE 또는 FEMALE이어야 합니다.' }),
+});
+
+export type UpdateGenderBody = z.infer<typeof updateGenderSchema>;
+
 export const profilePostsQuerySchema = z.object({
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_LIMIT).default(20),

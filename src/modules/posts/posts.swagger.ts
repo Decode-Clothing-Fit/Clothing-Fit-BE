@@ -70,6 +70,34 @@ postsRegistry.registerPath({
 });
 
 postsRegistry.registerPath({
+  method: 'delete',
+  path: '/posts/{id}',
+  summary: '게시글 삭제',
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: postIdParamSchema,
+  },
+  responses: {
+    204: {
+      description: '게시글 삭제 성공',
+    },
+    401: {
+      description: '인증 실패',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    403: {
+      description: '권한 없음 (본인 게시글 아님)',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    404: {
+      description: '게시글이 존재하지 않음',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});
+
+postsRegistry.registerPath({
   method: 'post',
   path: '/posts/{id}/like',
   summary: '좋아요',

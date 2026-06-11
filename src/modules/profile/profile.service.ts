@@ -2,7 +2,7 @@ import prisma from '@/lib/prisma/extensions';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 import { StatusCodes } from 'http-status-codes';
-import type { UpdateBodyInfoBody, UpdateNicknameBody, ProfilePostsQuery } from './profile.schema';
+import type { UpdateBodyInfoBody, UpdateGenderBody, UpdateNicknameBody, ProfilePostsQuery } from './profile.schema';
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client, S3_BUCKET } from '@/lib/storage/s3';
 import { v4 as uuidv4 } from 'uuid';
@@ -98,6 +98,14 @@ export const getBodyInfo = async (userId: string) => {
   }
 }
 
+export const updateGender = async (userId: string, body: UpdateGenderBody): Promise<void> => {
+  await prisma.profile.upsert({
+    where: { userId },
+    update: { gender: body.gender },
+    create: { userId, gender: body.gender, nickname: `user_${userId}` },
+  });
+};
+
 export const updateBodyInfo = async (userId: string, body: UpdateBodyInfoBody): Promise<void> => {
   const { height, weight, chest, waist, hip, shoulder, head, footSize } = body;
 
@@ -135,7 +143,7 @@ export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) =
   const { cursor, limit } = query;
 
   const views = await prisma.postView.findMany({
-    where: { userId },
+    where: { userId, post: { deletedAt: null } },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
     select: {
@@ -158,7 +166,7 @@ export const getRecentPosts = async (userId: string, query: ProfilePostsQuery) =
     id: view.post.id,
     cursorId: view.id,
     nickname: view.post.user.profile?.nickname ?? null,
-    imageUrl: view.post.closetArchive.imageUrl,
+    imageUrl: view.post.closetArchive?.imageUrl ?? null,
     likeCount: view.post._count.postLikes,
     isLiked: view.post.postLikes.length > 0,
     bookmarkCount: view.post._count.postBookmarks,
@@ -181,7 +189,7 @@ export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuer
   const { cursor, limit } = query;
 
   const bookmarks = await prisma.postBookmark.findMany({
-    where: { userId },
+    where: { userId, post: { deletedAt: null } },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
     select: {
@@ -204,7 +212,7 @@ export const getBookmarkedPosts = async (userId: string, query: ProfilePostsQuer
     id: bookmark.post.id,
     cursorId: bookmark.id,
     nickname: bookmark.post.user.profile?.nickname ?? null,
-    imageUrl: bookmark.post.closetArchive.imageUrl,
+    imageUrl: bookmark.post.closetArchive?.imageUrl ?? null,
     likeCount: bookmark.post._count.postLikes,
     isLiked: bookmark.post.postLikes.length > 0,
     bookmarkCount: bookmark.post._count.postBookmarks,
@@ -227,7 +235,7 @@ export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) =>
   const { cursor, limit } = query;
 
   const likes = await prisma.postLike.findMany({
-    where: { userId },
+    where: { userId, post: { deletedAt: null } },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
     select: {
@@ -250,7 +258,7 @@ export const getLikedPosts = async (userId: string, query: ProfilePostsQuery) =>
     id: like.post.id,
     cursorId: like.id,
     nickname: like.post.user.profile?.nickname ?? null,
-    imageUrl: like.post.closetArchive.imageUrl,
+    imageUrl: like.post.closetArchive?.imageUrl ?? null,
     likeCount: like.post._count.postLikes,
     isLiked: like.post.postLikes.length > 0,
     bookmarkCount: like.post._count.postBookmarks,

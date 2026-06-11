@@ -48,6 +48,10 @@ registry.registerPath({
       description: '유효하지 않은 카카오 토큰',
       content: { 'application/json': { schema: ErrorResponseSchema } },
     },
+    410: {
+      description: '탈퇴 후 7일 초과로 복구 불가',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
     429: TooManyRequestsResponse,
   },
 });
@@ -75,6 +79,10 @@ registry.registerPath({
     },
     401: {
       description: '유효하지 않은 구글 토큰',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    410: {
+      description: '탈퇴 후 7일 초과로 복구 불가',
       content: { 'application/json': { schema: ErrorResponseSchema } },
     },
     429: TooManyRequestsResponse,

@@ -2,8 +2,8 @@ import type { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '@/common/utils/async.handler';
 import { getProfile, checkNickname, updateNickname,
-  getBodyInfo, updateBodyInfo, getRecentPosts, getBookmarkedPosts, getLikedPosts, updateProfileImage } from './profile.service';
-import type { CheckNicknameQuery, UpdateNicknameBody, UpdateBodyInfoBody, ProfilePostsQuery } from './profile.schema';
+  getBodyInfo, updateBodyInfo, updateGender, getRecentPosts, getBookmarkedPosts, getLikedPosts, updateProfileImage } from './profile.service';
+import type { CheckNicknameQuery, UpdateNicknameBody, UpdateBodyInfoBody, UpdateGenderBody, ProfilePostsQuery } from './profile.schema';
 import { AppError } from '@/common/errors/app-error';
 import { ErrorCode } from '@/common/errors/error-code';
 
@@ -74,6 +74,15 @@ export const getLikedPostsController = asyncHandler(async (req: Request, res: Re
   const result = await getLikedPosts(userId, query);
 
   res.status(StatusCodes.OK).json(result);
+});
+
+export const updateGenderController = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const body = req.body as UpdateGenderBody;
+
+  await updateGender(userId, body);
+
+  res.status(StatusCodes.OK).send();
 });
 
 export const updateProfileImageController = asyncHandler(async (req: Request, res: Response) => {

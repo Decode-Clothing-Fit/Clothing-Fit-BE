@@ -10,6 +10,7 @@ export const getPopularPostsService = async (
   userId: string,
 ): Promise<PopularPostsResponse> => {
   const posts = await prisma.post.findMany({
+    where: { deletedAt: null },
     take: 10,
     orderBy: [
       { postLikes: { _count: 'desc' } },
@@ -44,12 +45,12 @@ export const getPopularPostsService = async (
   return posts.map((post) => ({
     postId: post.id,
     userId: post.user.id,
-    image: post.closetArchive!.imageUrl,
+    image: post.closetArchive?.imageUrl ?? null,
     nickname: post.user.profile?.nickname ?? '',
     createdAt: post.createdAt.toISOString(),
     likeCount: post._count.postLikes,
     isLiked: post.postLikes.length > 0,
-    itemImages: post.closetArchive!.closetItems
+    itemImages: (post.closetArchive?.closetItems ?? [])
       .map((item) => item.imageUrl)
       .filter((url): url is string => url !== null),
   }));
@@ -80,13 +81,14 @@ export const getRecommendedInfluencersService = async (
   const users = await prisma.user.findMany({
     where: {
       id: { in: candidateIds },
-      posts: { some: {} }, // 게시글 최소 1개
+      posts: { some: { deletedAt: null } }, // 삭제되지 않은 게시글 최소 1개
     },
     select: {
       id: true,
       profile: { select: { nickname: true, imageUrl: true } },
       _count: { select: { followers: true } },
       posts: {
+        where: { deletedAt: null },
         orderBy: [
           { postLikes: { _count: 'desc' } },
           { createdAt: 'desc' },
@@ -113,7 +115,7 @@ export const getRecommendedInfluencersService = async (
   return sorted.slice(0, 10).map((user) => ({
     userId: user.id,
     postId: user.posts[0].id,
-    postImage: user.posts[0].closetArchive!.imageUrl,
+    postImage: user.posts[0].closetArchive?.imageUrl ?? null,
     profileImage: user.profile?.imageUrl ?? null,
     nickname: user.profile?.nickname ?? '',
     followerCount: user._count.followers,

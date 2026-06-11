@@ -10,6 +10,8 @@ import type { GoogleUserInfo, KakaoUserInfo, SocialLoginResult } from './auth.ty
 import { env } from '@/config/env';
 import { removeDeviceToken } from '../notifications/notifications.service';
 
+const RECOVERY_DAYS = 7;
+
 // ── Profile ────────────────────────────────────────────────────────────────
 
 /**
@@ -67,6 +69,10 @@ export const kakaoLogin = async (accessToken: string): Promise<SocialLoginResult
     user = await prisma.user.create({ data: { provider: Provider.KAKAO, providerId, name } });
     isNewUser = true;
   } else if (user.deletedAt) {
+    const daysSinceDelete = (Date.now() - user.deletedAt.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceDelete > RECOVERY_DAYS) {
+      throw new AppError(ErrorCode.USER_NOT_FOUND, '탈퇴한 지 7일이 지나 복구할 수 없습니다.', StatusCodes.GONE);
+    }
     user = await prisma.user.update({ where: { id: user.id }, data: { deletedAt: null, name } });
     isNewUser = true;
   }
@@ -127,6 +133,10 @@ export const googleLogin = async (idToken: string): Promise<SocialLoginResult> =
     user = await prisma.user.create({ data: { provider: Provider.GOOGLE, providerId, name } });
     isNewUser = true;
   } else if (user.deletedAt) {
+    const daysSinceDelete = (Date.now() - user.deletedAt.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceDelete > RECOVERY_DAYS) {
+      throw new AppError(ErrorCode.USER_NOT_FOUND, '탈퇴한 지 7일이 지나 복구할 수 없습니다.', StatusCodes.GONE);
+    }
     user = await prisma.user.update({ where: { id: user.id }, data: { deletedAt: null, name } });
     isNewUser = true;
   }

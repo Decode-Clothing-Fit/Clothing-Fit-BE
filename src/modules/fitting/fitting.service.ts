@@ -924,6 +924,13 @@ export const generateCoordi = async (
     try {
         const result = await runCoordiGeneration(userId, garments);
         if (idemKey) fittingStore.setIdempotency(idemKey, { status: 'done', result, expiresAt: idemExpiresAt });
+        
+        createFitCompleteNotification({
+            receiverId: userId,
+            dimension: '2D',
+            closetArchiveId: result.closetArchiveId,
+        }).catch((err) => console.error('[Coordi] 알림 전송 실패', { userId, error: err }));
+        
         console.log('[Coordi] 생성 성공', { userId, garmentCount: garments.length, durationMs: Date.now() - startedAt });
         return result;
     } catch (err) {

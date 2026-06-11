@@ -62,7 +62,7 @@ export const getUserPosts = async (
   }
 
   const posts = await prisma.post.findMany({
-    where: { userId: targetUserId },
+    where: { userId: targetUserId, deletedAt: null },
     orderBy: { createdAt: 'desc' },
     take: query.limit + 1,
     select: {

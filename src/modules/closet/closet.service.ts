@@ -43,6 +43,7 @@ export type ClosetDetail = {
   imageUrl: string;
   modelUrl: string | null;
   isPublished: boolean;
+  postId: string | null;
   closetItems: ClosetItemDetail[];
 };
 
@@ -124,6 +125,7 @@ export const getClosetDetail = async (
     imageUrl: archive.imageUrl,
     modelUrl: archive.modelUrl,
     isPublished: archive.post !== null,
+    postId: archive.post?.id ?? null,
     closetItems: archive.closetItems,
   };
 };

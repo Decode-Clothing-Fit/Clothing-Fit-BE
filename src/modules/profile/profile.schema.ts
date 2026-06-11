@@ -5,6 +5,10 @@ export const profileResponseSchema = z.object({
   nickname: z.string().nullable(),
   imageUrl: z.string().nullable(),
   gender: z.string().nullable(),
+  height: z.number().nullable(),
+  weight: z.number().nullable(),
+  followerCount: z.number(),
+  followingCount: z.number(),
 }).openapi('ProfileResponse');
 
 export const updateNicknameSchema = z.object({

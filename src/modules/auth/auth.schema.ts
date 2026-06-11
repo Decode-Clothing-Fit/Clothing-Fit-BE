@@ -11,3 +11,8 @@ export const googleLoginSchema = z.object({
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, '리프레시 토큰이 필요합니다.'),
 });
+
+export const logoutBodySchema = z.object({
+  refreshToken: z.string().min(1, '리프레시 토큰이 필요합니다.'),
+  deviceToken: z.string().min(1).optional(),
+})

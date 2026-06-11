@@ -2,10 +2,10 @@ import { type Router as RouterType, Router} from 'express'
 import { authenticate } from '@/common/middleware/auth.middleware'
 import { validate } from '@/common/middleware/validate.middleware'
 import { getProfileController, checkNicknameController, updateNicknameController,
-    getBodyInfoController, updateBodyInfoController, getRecentPostsController, getBookmarkedPostsController, getLikedPostsController,
+    getBodyInfoController, updateBodyInfoController, updateGenderController, getRecentPostsController, getBookmarkedPostsController, getLikedPostsController,
     updateProfileImageController
  } from './profile.controller'
-import { checkNicknameSchema, updateNicknameSchema, updateBodyInfoSchema, profilePostsQuerySchema } from './profile.schema'
+import { checkNicknameSchema, updateNicknameSchema, updateBodyInfoSchema, updateGenderSchema, profilePostsQuerySchema } from './profile.schema'
 import { singleImageUpload } from '@/common/middleware/upload.middleware';
 
 const router: RouterType = Router();
@@ -29,6 +29,9 @@ router.get('/body', authenticate, getBodyInfoController);
 // 체형 정보 수정
 router.patch('/body', authenticate, validate({
     body: updateBodyInfoSchema }), updateBodyInfoController);
+
+// 성별 변경
+router.patch('/gender', authenticate, validate({ body: updateGenderSchema }), updateGenderController);
 
 // 최근 조회한 커뮤니티 목록
 router.get('/recent-posts', authenticate, validate({ query: profilePostsQuerySchema }), getRecentPostsController);

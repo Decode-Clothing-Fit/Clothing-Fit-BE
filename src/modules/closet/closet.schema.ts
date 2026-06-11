@@ -65,6 +65,7 @@ export const ClosetDetailSchema = z
     imageUrl: z.string().url().openapi({ example: 'https://example.com/closet.png' }),
     modelUrl: z.string().url().nullable().openapi({ example: 'https://example.com/model.glb' }),
     isPublished: z.boolean().openapi({ example: false }),
+    postId: z.string().uuid().nullable().openapi({ example: '01900000-0000-7000-8000-000000000003' }),
     closetItems: z.array(ClosetItemDetailSchema),
   })
   .openapi('ClosetDetail');

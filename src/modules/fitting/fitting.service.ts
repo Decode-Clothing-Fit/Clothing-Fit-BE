@@ -10,6 +10,7 @@ import { logger } from '@/lib/logger/logger';
 import prisma from '@/lib/prisma/extensions';
 import { uploadFittingModel, deleteFittingModel } from '@/lib/storage/fitting-model';
 import { uploadClosetImage, deleteClosetImage } from '@/lib/storage/closet-image';
+import { COORDI_BACKGROUND_BASE64, COORDI_BACKGROUND_MIME } from '@/assets/coordi-background';
 import { fittingStore, type FittingSession, type CoordiResult } from './fitting.store';
 import type { CoordiMeasurements } from './fitting.schema';
 import { CATEGORY_LABEL, CATEGORY_EN, buildCoordiPrompt, buildOutfitNamePrompt, parseOutfitName } from './fitting.prompt';
@@ -420,7 +421,7 @@ const AVATAR_FETCH_TIMEOUT_MS = 10_000; // 아바타 이미지가 무응답일 �
 const MAX_COORDI_PER_USER = 1; // 사용자당 동시 2D 코디 생성 수 (비용·메모리 폭증 방지)
 const COORDI_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000; // 멱등성 키 보관 시간 (중복 제출 차단/결과 재반환)
 const COORDI_CHARACTER_TEMPERATURE = 0.2; // 캐릭터: 색/디테일 재해석 억제 (보존 우선)
-const COORDI_UPLOAD_TEMPERATURE = 0.4; // 업로드 사진: 원본 옷을 실제로 교체하도록 변형 자유도 부여
+const COORDI_UPLOAD_TEMPERATURE = 0.5; // 업로드 사진: 원본 옷을 실제로 교체하도록 변형 자유도 부여 (옷 미교체 완화용 상향, 실험값)
 const RESIZE_MAX_DIMENSION = 1024; // 의류 디테일(패턴·로고) 보존을 위해 입력 해상도 상향
 // 색 틀어짐을 최소화하기 위해 고품질(q95)로 인코딩한다. (무손실 PNG는 사진 의류 이미지에서 용량이 과해 메모리 부담↑)
 const RESIZE_JPEG_QUALITY = 95;
@@ -571,15 +572,73 @@ function nearestAspectRatio(width: number, height: number): string {
     return best[0];
 }
 
+/** 생성 결과에서 입력 패딩분을 떼어내기 위한 크롭 영역(0~1 분율). */
+type CropFractions = { left: number; top: number; width: number; height: number };
+
+/** SUPPORTED_ASPECT_RATIOS 이름 → 수치(W/H). 못 찾으면 1. */
+function aspectRatioValue(name: string): number {
+    return SUPPORTED_ASPECT_RATIOS.find(([n]) => n === name)?.[1] ?? 1;
+}
+
+/**
+ * 업로드 사진을 목표 비율(버킷)에 정확히 맞도록 가장자리 복제(extendWith:'copy') 패딩한다.
+ * 입력 비율 == 출력 요청 비율이 되면 모델이 인물을 잘라 재구성하는 일이 줄고,
+ * 생성 후 동일 분율로 패딩을 떼어내면(cropToFractions) 원본 비율을 정확히 복원할 수 있다.
+ */
+async function padUploadedToRatio(
+    buffer: Buffer,
+    width: number,
+    height: number,
+    targetRatio: number,
+): Promise<{ buffer: Buffer; cropBack: CropFractions | null }> {
+    const srcRatio = width / height;
+    // 1% 이내면 이미 충분히 일치 → 패딩/크롭 불필요
+    if (Math.abs(srcRatio - targetRatio) / targetRatio < 0.01) {
+        return { buffer, cropBack: null };
+    }
+    if (srcRatio < targetRatio) {
+        // 원본이 더 세로로 긺 → 좌우 패딩으로 가로를 늘린다
+        const targetW = Math.round(height * targetRatio);
+        const pad = targetW - width;
+        const left = Math.floor(pad / 2);
+        const padded = (await sharp(buffer)
+            .extend({ left, right: pad - left, extendWith: 'copy' })
+            .toBuffer()) as Buffer;
+        return { buffer: padded, cropBack: { left: left / targetW, top: 0, width: width / targetW, height: 1 } };
+    }
+    // 원본이 더 가로로 긺 → 상하 패딩으로 세로를 늘린다
+    const targetH = Math.round(width / targetRatio);
+    const pad = targetH - height;
+    const top = Math.floor(pad / 2);
+    const padded = (await sharp(buffer)
+        .extend({ top, bottom: pad - top, extendWith: 'copy' })
+        .toBuffer()) as Buffer;
+    return { buffer: padded, cropBack: { left: 0, top: top / targetH, width: 1, height: height / targetH } };
+}
+
+/** 생성 결과 버퍼에서 패딩분(분율)을 떼어내 원본 비율을 복원한다. 출력 포맷은 입력과 동일하게 유지. */
+async function cropToFractions(buffer: Buffer, crop: CropFractions): Promise<Buffer> {
+    const meta = await sharp(buffer).metadata();
+    const W = meta.width ?? 1;
+    const H = meta.height ?? 1;
+    const left = Math.min(Math.round(crop.left * W), W - 1);
+    const top = Math.min(Math.round(crop.top * H), H - 1);
+    const width = Math.max(1, Math.min(Math.round(crop.width * W), W - left));
+    const height = Math.max(1, Math.min(Math.round(crop.height * H), H - top));
+    return (await sharp(buffer).extract({ left, top, width, height }).toBuffer()) as Buffer;
+}
+
 /**
  * 아바타(타임아웃 fetch)와 의류 시트를 리사이즈해 Gemini 멀티모달 parts를 만든다.
  * 인물 사진 비율에 맞춘 출력 종횡비(aspectRatio)도 함께 반환해 결과가 잘리지 않게 한다.
+ * 업로드 사진은 버킷 비율에 맞춰 패딩해 보내고, 출력에서 떼어낼 cropBack 분율을 함께 반환한다.
  */
 async function buildCoordiParts(
     avatarUrl: string,
     garments: CoordiGarment[],
     prompt: string,
-): Promise<{ parts: object[]; aspectRatio: string }> {
+    isUploadedImage: boolean,
+): Promise<{ parts: object[]; aspectRatio: string; cropBack: CropFractions | null }> {
     let avatarResponse: Response;
     try {
         avatarResponse = await fetch(avatarUrl, { signal: AbortSignal.timeout(AVATAR_FETCH_TIMEOUT_MS) });
@@ -606,8 +665,28 @@ async function buildCoordiParts(
         });
     const aspectRatio = nearestAspectRatio(meta.width ?? 1, meta.height ?? 1);
 
+    // 업로드 사진은 버킷 비율과 원본 비율이 달라 모델이 인물을 잘라 재구성하는 문제가 있다.
+    // 미리 버킷 비율로 패딩해 보내고(입력=출력 비율), 생성 후 cropBack으로 원본 비율을 복원한다.
+    let subjectBuffer: Buffer = avatarBuffer;
+    let cropBack: CropFractions | null = null;
+    if (isUploadedImage) {
+        const padded = await padUploadedToRatio(
+            avatarBuffer,
+            meta.width ?? 1,
+            meta.height ?? 1,
+            aspectRatioValue(aspectRatio),
+        ).catch((err) => {
+            logger.warn('업로드 사진 비율 패딩 실패, 원본 비율로 진행', {
+                message: err instanceof Error ? err.message : String(err),
+            });
+            return { buffer: avatarBuffer, cropBack: null as CropFractions | null };
+        });
+        subjectBuffer = padded.buffer;
+        cropBack = padded.cropBack;
+    }
+
     const [avatarData, garmentSheet] = await Promise.all([
-        toResizedBase64(avatarBuffer).catch((err) => {
+        toResizedBase64(subjectBuffer).catch((err) => {
             logger.warn('아바타 원본 리사이즈 실패', { message: err instanceof Error ? err.message : String(err) });
             throw new AppError(ErrorCode.FITTING_FAILED, '아바타 이미지를 처리할 수 없습니다.', StatusCodes.BAD_GATEWAY);
         }),
@@ -617,16 +696,25 @@ async function buildCoordiParts(
         }),
     ]);
 
-    return {
-        parts: [
-            { text: 'Image 1 — subject:' },
-            { inlineData: { mimeType: 'image/jpeg', data: avatarData } },
-            { text: 'Image 2 — garment contact sheet (each labeled cell is one garment to put on the subject):' },
-            { inlineData: { mimeType: 'image/jpeg', data: garmentSheet } },
-            { text: prompt },
-        ],
-        aspectRatio,
-    };
+    const parts: object[] = [
+        { text: 'Image 1 — subject:' },
+        { inlineData: { mimeType: 'image/jpeg', data: avatarData } },
+        { text: 'Image 2 — garment contact sheet (each labeled cell is one garment to put on the subject):' },
+        { inlineData: { mimeType: 'image/jpeg', data: garmentSheet } },
+    ];
+
+    // 프리셋 아바타는 배경이 매번 달라지는 문제가 있어, 고정 스튜디오 배경(Image 3)을 함께 줘 일관성을 높인다.
+    // 업로드 실사진은 원본 배경을 그대로 유지해야 하므로 배경을 주지 않는다.
+    if (!isUploadedImage) {
+        parts.push(
+            { text: 'Image 3 — background: the exact studio background to place the subject in.' },
+            { inlineData: { mimeType: COORDI_BACKGROUND_MIME, data: COORDI_BACKGROUND_BASE64 } },
+        );
+    }
+
+    parts.push({ text: prompt });
+
+    return { parts, aspectRatio, cropBack };
 }
 
 /** Gemini 이미지 생성 호출. 전송 디테일은 lib/ai/gemini가 담당하고, 여기서는 실패 reason을 HTTP 상태로 매핑한다. */
@@ -636,6 +724,14 @@ async function runGemini(parts: object[], opts: ImageGenOptions): Promise<{ data
     } catch (err) {
         if (err instanceof GeminiApiError && err.reason === 'TIMEOUT') {
             throw new AppError(ErrorCode.GEMINI_API_ERROR, 'Gemini 응답 타임아웃', StatusCodes.GATEWAY_TIMEOUT);
+        }
+        // 모델 측 일시 과부하(503)·레이트리밋(429): 즉시 실패시키고 잠시 후 재시도를 안내한다.
+        if (err instanceof GeminiApiError && err.reason === 'OVERLOADED') {
+            throw new AppError(
+                ErrorCode.GEMINI_API_ERROR,
+                '현재 AI 이미지 생성 요청이 많아 일시적으로 처리할 수 없습니다. 잠시 후 다시 시도해주세요.',
+                StatusCodes.SERVICE_UNAVAILABLE,
+            );
         }
         throw new AppError(ErrorCode.GEMINI_API_ERROR, '코디 이미지 생성에 실패했습니다.', StatusCodes.BAD_GATEWAY);
     }
@@ -744,7 +840,7 @@ async function runCoordiGeneration(userId: string, garments: CoordiGarment[]): P
         garments,
         isUploadedImage: ctx.isUploadedImage,
     });
-    const { parts, aspectRatio } = await buildCoordiParts(ctx.avatarUrl, garments, prompt);
+    const { parts, aspectRatio, cropBack } = await buildCoordiParts(ctx.avatarUrl, garments, prompt, ctx.isUploadedImage);
 
     // 업로드 사진은 "옷 교체"를 실제로 일으키려면 자유도(temperature)가 더 필요하다.
     // 캐릭터는 색/디테일 보존을 위해 낮게 유지한다.
@@ -758,8 +854,17 @@ async function runCoordiGeneration(userId: string, garments: CoordiGarment[]): P
     ]);
     const geminiMs = Date.now() - geminiStartedAt;
 
-    const coordiBuffer = Buffer.from(generated.data, 'base64');
+    let coordiBuffer: Buffer = Buffer.from(generated.data, 'base64');
     const coordiContentType = generated.mimeType.startsWith('image/') ? generated.mimeType : 'image/png';
+    // 업로드 사진: 전송 전 넣은 패딩분을 떼어내 원본 비율을 복원한다. 실패해도 코디 자체는 살린다(패딩 포함본 사용).
+    if (cropBack) {
+        coordiBuffer = await cropToFractions(coordiBuffer, cropBack).catch((err) => {
+            logger.warn('업로드 사진 결과 크롭(비율 복원) 실패, 패딩 포함본 사용', {
+                message: err instanceof Error ? err.message : String(err),
+            });
+            return coordiBuffer;
+        });
+    }
     const { coordiImageUrl, clothingImageUrls } = await uploadCoordiImages(userId, coordiBuffer, coordiContentType, garments);
 
     const closetArchiveId = await persistCoordi(userId, {

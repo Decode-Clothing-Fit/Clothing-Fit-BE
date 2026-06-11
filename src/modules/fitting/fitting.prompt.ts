@@ -110,14 +110,14 @@ export function buildCoordiPrompt(params: {
           'Do NOT re-pose, rotate, or re-frame the avatar. Do NOT turn it into a real human, and do NOT restyle it as a generic store mannequin. ONLY change the clothing.';
 
     // 안 고른(Null) 필수 의류(상의·하의)에 입힐 "기본 옷". 맨몸 방지 + 디폴트 일관성.
-    // TOP은 흰 티셔츠, BOTTOM은 청바지로 고정한다.
+    // TOP은 하얀색 나시(민소매 탱크탑), BOTTOM은 검은 트렁크 팬티로 고정한다.
     const provided = new Set(garments.map((g) => g.category));
     const ESSENTIAL_DEFAULTS: Array<[ClothingType, string]> = [
-        ['TOP', 'a plain white crew-neck T-shirt'],
-        ['BOTTOM', 'plain blue denim jeans'],
+        ['TOP', 'a plain white sleeveless tank top'],
+        ['BOTTOM', 'plain black trunk briefs'],
     ];
     const missingDefaults = ESSENTIAL_DEFAULTS.filter(([c]) => !provided.has(c));
-    // "Top → a plain white crew-neck T-shirt; Bottom → plain blue denim jeans" 형태의 지시 문구
+    // "Top → a plain white sleeveless tank top; Bottom → plain black trunk briefs" 형태의 지시 문구
     const missingDefaultsText = missingDefaults.map(([c, desc]) => `${CATEGORY_EN[c]} → ${desc}`).join('; ');
 
     // 요청·출력 항목을 소스별로 분기.
@@ -141,7 +141,7 @@ export function buildCoordiPrompt(params: {
                   ? `The avatar must end up FULLY DRESSED — never show bare skin on the torso or legs. For the essential clothing not provided, dress it in these exact defaults: ${missingDefaultsText}.`
                   : 'The avatar must end up fully dressed — never show bare skin on the torso or legs.',
               'Naturally complete any other categories that are not provided (e.g. shoes, outer) in a simple, unobtrusive way.',
-              'Use a clean studio-style background.',
+              'Place the avatar in the EXACT background shown in image 3 — reproduce that background precisely (same color, gradient, vignette, floor, and lighting). Do NOT invent, alter, or replace the background.',
               'Frame the entire body from head to toe; do not crop the head.',
           ];
 
@@ -169,6 +169,12 @@ export function buildCoordiPrompt(params: {
         '[Images]',
         `- Image 1: subject (fixed — ${isUploadedImage ? 'real uploaded photo' : 'stylized avatar'})`,
         '- Image 2: a contact sheet of ALL garments to put on the subject. Each cell is one garment, labeled with its number and category (e.g. "1. Top", "2. Bottom"). The labels match the [Garments] list below in order. Apply every garment shown to the matching body part.',
+        // 프리셋 아바타에만 고정 배경(Image 3)을 제공해 배경 일관성을 확보한다. 업로드 사진은 원본 배경 유지라 제외.
+        ...(isUploadedImage
+            ? []
+            : [
+                  '- Image 3: the exact studio background to place the subject in. Reproduce this background precisely as the scene behind the avatar; do not invent or alter it.',
+              ]),
         '',
         '[Request]',
         ...requests.map((line, i) => `${i + 1}. ${line}`),
@@ -184,6 +190,13 @@ export function buildCoordiPrompt(params: {
               ]
             : []),
         criticalIdentity,
+        // 프리셋 아바타는 고정 배경(Image 3) 재현을 한 번 더 못 박아 배경 일관성을 강제한다.
+        ...(isUploadedImage
+            ? []
+            : [
+                  'CRITICAL (background): Use the background from image 3 EXACTLY as shown — same color, gradient, vignette, floor, and lighting. ' +
+                      'Do NOT generate a different background, change its tone, or add any props/objects/shadows of your own. Only the avatar and its garments are foreground; everything behind must match image 3.',
+              ]),
         'CRITICAL (garment fidelity): Each garment must look identical to its cell in the image 2 contact sheet — same color, pattern, print/logo, and shape. ' +
             'Do not alter, recolor, or redesign the garments, and ignore the sheet\'s white background and labels; only fit each garment naturally onto the body.',
     ].join('\n');

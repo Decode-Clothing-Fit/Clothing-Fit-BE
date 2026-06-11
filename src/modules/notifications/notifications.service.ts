@@ -186,7 +186,7 @@ const createNotification = async (
         closetArchive: { select: { imageUrl: true } },
       },
     });
-    post = p ? { id: p.id, image: p.closetArchive.imageUrl } : null;
+    post = p ? { id: p.id, image: p.closetArchive?.imageUrl ?? null } : null;
   }
   const dto = toNotificationDto(created, { post });
 
@@ -246,7 +246,7 @@ const getNotificationPost = async (
       closetArchive: { select: { imageUrl: true } },
     },
   });
-  return p ? { id: p.id, image: p.closetArchive.imageUrl } : null;
+  return p ? { id: p.id, image: p.closetArchive?.imageUrl ?? null } : null;
 };
 
 // 다수에게 알림

@@ -1,7 +1,15 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ApiError } from '@google/genai';
 import { env } from '@/config/env';
 
-export const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+// SDK 내부 재시도 횟수(기본 5). 503(모델 과부하)이 오면 SDK가 백오프 재시도를 반복하는데,
+// 기본 5회면 우리 타임아웃(180초)까지 누적돼 503이 무응답(hang)처럼 보인다.
+// 2로 낮춰(=1회 재시도) 일시적 blip은 흡수하되, 지속 503은 수초 내 표면화시켜 빠르게 실패시킨다.
+const GEMINI_RETRY_ATTEMPTS = 2;
+
+export const gemini = new GoogleGenAI({
+    apiKey: env.GEMINI_API_KEY,
+    httpOptions: { retryOptions: { attempts: GEMINI_RETRY_ATTEMPTS } },
+});
 
 const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
 const GEMINI_TEXT_MODEL = 'gemini-2.5-flash';
@@ -15,17 +23,23 @@ const MAX_ATTEMPTS = 3;
 /**
  * Gemini 멀티모달 호출 실패를 나타내는 에러. 호출부에서 reason으로 분기할 수 있습니다.
  * - TIMEOUT: 응답 타임아웃
+ * - OVERLOADED: 모델 측 일시 과부하(503)·레이트리밋(429) — 잠시 후 재시도하면 됨
  * - NO_IMAGE: 응답에 이미지가 없음
  * - REQUEST_FAILED: 요청 자체 실패 (재시도 후에도 실패)
  */
 export class GeminiApiError extends Error {
     constructor(
-        readonly reason: 'TIMEOUT' | 'NO_IMAGE' | 'REQUEST_FAILED',
+        readonly reason: 'TIMEOUT' | 'OVERLOADED' | 'NO_IMAGE' | 'REQUEST_FAILED',
         readonly cause?: unknown,
     ) {
         super(`Gemini API 오류 (${reason})`);
         this.name = 'GeminiApiError';
     }
+}
+
+/** Google 측 일시 과부하(503)·레이트리밋(429)인지. 이 경우 재시도하지 않고 빠르게 실패시킨다. */
+function isOverloadError(err: unknown): boolean {
+    return err instanceof ApiError && (err.status === 503 || err.status === 429);
 }
 
 /** 생성된 이미지(base64). */
@@ -114,6 +128,11 @@ export const generateMultimodalImage = async (parts: object[], opts: ImageGenOpt
             console.error(`[Gemini] 이미지 생성 실패 (시도 ${attempt}/${MAX_ATTEMPTS}):`, err);
             // 타임아웃은 즉시 실패 처리 (재시도 시 중복 호출 누적 방지)
             if (err instanceof GeminiApiError && err.reason === 'TIMEOUT') break;
+            // 모델 과부하(503)·레이트리밋(429)은 재시도해도 대개 무용 → 빠르게 OVERLOADED로 실패시킨다.
+            if (isOverloadError(err)) {
+                lastError = new GeminiApiError('OVERLOADED', err);
+                break;
+            }
         }
     }
     throw lastError instanceof GeminiApiError ? lastError : new GeminiApiError('REQUEST_FAILED', lastError);

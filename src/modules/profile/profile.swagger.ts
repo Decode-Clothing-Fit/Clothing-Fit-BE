@@ -140,6 +140,39 @@ registry.registerPath({
   },
 });
 
+// 성별 변경
+registry.registerPath({
+  method: 'patch',
+  path: '/profile/gender',
+  tags: ['Profile'],
+  summary: '성별 변경',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            gender: z.enum(['MALE', 'FEMALE']).openapi({ example: 'FEMALE' }),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: '성별 변경 성공',
+    },
+    400: {
+      description: '잘못된 요청',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    401: {
+      description: '인증 실패',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+});
+
 // 최근 조회한 커뮤니티 목록
 registry.registerPath({
   method: 'get',

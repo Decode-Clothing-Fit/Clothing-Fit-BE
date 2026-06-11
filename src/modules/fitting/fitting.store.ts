@@ -1,4 +1,15 @@
-// Redis 등으로 교체할 때 이 인터페이스만 구현하면 됩니다.
+// Redis 등으로 교체할 때 이 인터페이스를 구현하면 됩니다.
+//
+// ⚠️ 단, 멀티 인스턴스 전환 시 아래 메서드들을 "그대로" 구현하지 말 것:
+//   - getCoordiCount + incrementCoordiCount
+//   - getIdempotency + setIdempotency
+// 호출부(generateCoordi)가 read→write를 분리해 호출하므로 check-then-act 레이스가 있다.
+// 단일 프로세스(InMemory)에서는 두 호출 사이에 await가 없어 이벤트 루프상 원자적이라 안전하지만,
+// Redis/멀티 인스턴스에서는 각 호출이 별도 왕복이라 두 요청이 동시에 "빈 상태"를 읽고 둘 다 통과 →
+// 사용자당 1건 제한과 Idempotency 409/결과 재반환 계약이 깨지고 중복 생성·저장이 발생한다.
+// 전환 시에는 tryAcquireCoordiSlot / reserveIdempotency 같은 원자(compare-and-set) 연산
+// (SET NX PX, INCR+한도검사, Lua 스크립트 등)으로 경계를 올린 뒤 generateCoordi 호출부를 함께 바꿀 것.
+// (멱등성 예약 후 슬롯 획득 실패 시 예약 롤백 순서도 같이 처리해야 함)
 
 export type FittingStatus = 'QUEUED' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 
@@ -16,6 +27,18 @@ export type FittingSession = {
     errorCount: number;
 };
 
+/** 2D 코디 생성 결과 (멱등성 캐시에 저장하는 응답 본문). */
+export type CoordiResult = { closetArchiveId: string; imageUrl: string; outfitName: string };
+
+/**
+ * 2D 코디 멱등성 레코드. 같은 Idempotency-Key 재요청을 식별한다.
+ * - pending: 처리 중 (동시 중복 요청은 409로 거부)
+ * - done: 완료 (동일 키 재요청에 캐시된 결과를 그대로 반환)
+ */
+export type CoordiIdempotencyRecord =
+    | { status: 'pending'; expiresAt: number }
+    | { status: 'done'; result: CoordiResult; expiresAt: number };
+
 export interface IFittingStore {
     // 세션
     getSession(id: string): FittingSession | undefined;
@@ -32,10 +55,20 @@ export interface IFittingStore {
     incrementActive(): void;
     decrementActive(): void;
 
-    // 사용자별 활성 세션 수 (중복 요청 방지)
+    // 사용자별 활성 3D 세션 수 (중복 요청 방지)
     getUserCount(userId: string): number;
     incrementUserCount(userId: string): void;
     decrementUserCount(userId: string): void;
+
+    // 사용자별 진행 중 2D 코디 생성 수 (동시성 제한)
+    getCoordiCount(userId: string): number;
+    incrementCoordiCount(userId: string): void;
+    decrementCoordiCount(userId: string): void;
+
+    // 2D 코디 멱등성 캐시 (key = `${userId}:${idempotencyKey}`)
+    getIdempotency(key: string): CoordiIdempotencyRecord | undefined;
+    setIdempotency(key: string, record: CoordiIdempotencyRecord): void;
+    deleteIdempotency(key: string): void;
 }
 
 class InMemoryFittingStore implements IFittingStore {
@@ -43,6 +76,8 @@ class InMemoryFittingStore implements IFittingStore {
     private queue: string[] = [];
     private activeCount = 0;
     private userCounts = new Map<string, number>();
+    private coordiCounts = new Map<string, number>();
+    private idempotency = new Map<string, CoordiIdempotencyRecord>();
 
     getSession(id: string) { return this.sessions.get(id); }
     setSession(id: string, session: FittingSession) { this.sessions.set(id, session); }
@@ -65,6 +100,20 @@ class InMemoryFittingStore implements IFittingStore {
         if (count <= 1) this.userCounts.delete(userId);
         else this.userCounts.set(userId, count - 1);
     }
+
+    getCoordiCount(userId: string) { return this.coordiCounts.get(userId) ?? 0; }
+    incrementCoordiCount(userId: string) {
+        this.coordiCounts.set(userId, this.getCoordiCount(userId) + 1);
+    }
+    decrementCoordiCount(userId: string) {
+        const count = this.getCoordiCount(userId);
+        if (count <= 1) this.coordiCounts.delete(userId);
+        else this.coordiCounts.set(userId, count - 1);
+    }
+
+    getIdempotency(key: string) { return this.idempotency.get(key); }
+    setIdempotency(key: string, record: CoordiIdempotencyRecord) { this.idempotency.set(key, record); }
+    deleteIdempotency(key: string) { this.idempotency.delete(key); }
 }
 
 export const fittingStore: IFittingStore = new InMemoryFittingStore();

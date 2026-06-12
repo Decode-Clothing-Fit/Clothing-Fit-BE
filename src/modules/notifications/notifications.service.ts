@@ -27,7 +27,7 @@ export const toNotificationDto = (
   refs: { post?: { id: string; image: string | null } | null } = {},
 ): NotificationDto => {
   const actor = n.actor
-    ? { id: n.actor.id, nickname: n.actor.profile?.nickname ?? null }
+    ? { id: n.actor.id, nickname: n.actor.profile?.nickname ?? null, imageUrl: n.actor.profile?.imageUrl ?? null }
     : null;
 
   const isActorType =
@@ -62,7 +62,7 @@ export const getNotifications = async (
       take: limit + 1,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       include: {
-        actor: { select: { id: true, profile: { select: { nickname: true } } } },
+        actor: { select: { id: true, profile: { select: { nickname: true, imageUrl: true } } } },
       },
     }),
     prisma.notification.count({
@@ -165,7 +165,7 @@ const createNotification = async (
       targetId: input.targetId ?? null,
     },
     include: {
-      actor: { select: { id: true, profile: { select: { nickname: true } } } },
+      actor: { select: { id: true, profile: { select: { nickname: true, imageUrl: true } } } },
     },
   });
 
@@ -277,7 +277,7 @@ const createFanoutNotification = async (input: {
       targetId: input.targetId,
     })),
     include: {
-      actor: { select: { id: true, profile: { select: { nickname: true } } } },
+      actor: { select: { id: true, profile: { select: { nickname: true, imageUrl: true } } } },
     },
   });
 

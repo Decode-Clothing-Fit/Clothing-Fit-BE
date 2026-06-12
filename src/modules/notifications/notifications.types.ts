@@ -9,5 +9,5 @@ export type CreateNotificationInput = {
 };
 
 export type RawNotification = Prisma.NotificationGetPayload<{
-  include: { actor: { select: { id: true; profile: { select: { nickname: true } } } } };
+  include: { actor: { select: { id: true; profile: { select: { nickname: true, imageUrl: true } } } } };
 }>;

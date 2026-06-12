@@ -11,6 +11,7 @@ export const notificationSchema = z.object({
   actor: z.object({
     id: z.string().uuid(),
     nickname: z.string().nullable(),
+    imageUrl: z.string().nullable(),
   })
   .nullable(),
   post: z.object({

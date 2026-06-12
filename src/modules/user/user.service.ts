@@ -24,7 +24,7 @@ export const getUserProfile = async (userId: string, requesterId: string) => {
         profile: true,
         _count: {
           select: {
-            posts: true,
+            posts: { where: { deletedAt: null } },
             followers: true,
             following: true,
           },

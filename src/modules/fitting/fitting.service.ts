@@ -419,6 +419,10 @@ function garmentDisplayName(g: CoordiGarment): string {
 
 const AVATAR_FETCH_TIMEOUT_MS = 10_000; // 아바타 이미지가 무응답일 때 무한 대기 방지
 const MAX_COORDI_PER_USER = 1; // 사용자당 동시 2D 코디 생성 수 (비용·메모리 폭증 방지)
+// 전역 동시 2D 코디 생성 상한. 각 요청이 sharp 파이프라인 + base64 버퍼를 메모리에 들고 Gemini를 호출하므로,
+// 트래픽이 몰리면 동시 호출이 폭증해 비용 스파이크·OOM으로 이어진다. 큐 없이 상한 초과 시 빠르게 429로 거절한다.
+// (단일 프로세스 기준값. 멀티 인스턴스 전환 시 이 캡은 인스턴스별로 적용되므로 분산 세마포어로 올려야 한다.)
+const MAX_CONCURRENT_COORDI = 5;
 const COORDI_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000; // 멱등성 키 보관 시간 (중복 제출 차단/결과 재반환)
 const COORDI_CHARACTER_TEMPERATURE = 0.2; // 캐릭터: 색/디테일 재해석 억제 (보존 우선)
 const COORDI_UPLOAD_TEMPERATURE = 0.5; // 업로드 사진: 원본 옷을 실제로 교체하도록 변형 자유도 부여 (옷 미교체 완화용 상향, 실험값)
@@ -512,7 +516,8 @@ async function loadCoordiContext(userId: string): Promise<CoordiContext> {
     const [userCharacter, bodyInfo, profile] = await Promise.all([
         prisma.userCharacter.findUnique({
             where: { userId },
-            select: { imageUrl: true, character: { select: { imageUrl: true } } },
+            // 프리셋 캐릭터: 화면 표시용 image_url은 누끼라, 코디 생성에는 배경 포함본(fitting_image_url)을 쓴다.
+            select: { imageUrl: true, character: { select: { imageUrl: true, fittingImageUrl: true } } },
         }),
         prisma.bodyInfo.findFirst({
             where: { userId },
@@ -522,10 +527,12 @@ async function loadCoordiContext(userId: string): Promise<CoordiContext> {
         prisma.profile.findUnique({ where: { userId }, select: { gender: true } }),
     ]);
 
-    // UPLOAD면 userCharacter.imageUrl(사용자 사진), CHARACTER면 character.imageUrl(프리셋 아바타).
+    // UPLOAD면 userCharacter.imageUrl(사용자 사진), CHARACTER면 프리셋 아바타.
+    // 프리셋은 코디 생성용 배경 포함본(fittingImageUrl)을 우선 쓰고, 없으면 표시용 image_url로 폴백한다.
     // 실제로 어떤 이미지를 보내는지와 정확히 일치하도록, 업로드 URL 존재 여부로 소스를 판별한다.
     const uploadedUrl = userCharacter?.imageUrl ?? null;
-    const avatarUrl = uploadedUrl ?? userCharacter?.character?.imageUrl;
+    const character = userCharacter?.character;
+    const avatarUrl = uploadedUrl ?? character?.fittingImageUrl ?? character?.imageUrl;
     if (!avatarUrl) {
         throw new AppError(ErrorCode.FITTING_FAILED, '아바타 정보가 없습니다.', StatusCodes.NOT_FOUND);
     }
@@ -908,11 +915,19 @@ export const generateCoordi = async (
         }
     }
 
-    // #1 사용자당 동시 2D 생성 제한 (await 이전에 선점)
+    // #1-a 전역 동시 2D 생성 상한 — 비용·메모리(OOM) 폭증 방지. 초과 시 큐 없이 빠르게 429로 거절.
+    // 사용자별 제한보다 먼저 확인해, 전역이 꽉 차면 카운터를 건드리기 전에 즉시 빠져나간다.
+    if (fittingStore.getActiveCoordiCount() >= MAX_CONCURRENT_COORDI) {
+        throw new AppError(ErrorCode.TOO_MANY_REQUESTS, '현재 코디 생성 요청이 많습니다. 잠시 후 다시 시도해주세요.', StatusCodes.TOO_MANY_REQUESTS);
+    }
+
+    // #1-b 사용자당 동시 2D 생성 제한 (await 이전에 선점)
     if (fittingStore.getCoordiCount(userId) >= MAX_COORDI_PER_USER) {
         throw new AppError(ErrorCode.FITTING_IN_PROGRESS, '이미 진행 중인 코디 생성이 있습니다.', StatusCodes.CONFLICT);
     }
+    // 두 카운터는 await 없이 연속 증가시켜 단일 프로세스에서 원자적으로 선점한다.
     fittingStore.incrementCoordiCount(userId);
+    fittingStore.incrementActiveCoordiCount();
 
     const idemExpiresAt = Date.now() + COORDI_IDEMPOTENCY_TTL_MS;
     if (idemKey) {
@@ -940,5 +955,6 @@ export const generateCoordi = async (
         throw err;
     } finally {
         fittingStore.decrementCoordiCount(userId);
+        fittingStore.decrementActiveCoordiCount();
     }
 };

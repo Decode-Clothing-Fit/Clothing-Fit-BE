@@ -77,7 +77,8 @@ model Character {
   id        String   @id @db.Uuid @default(uuid())
   gender    Gender
   bodyType  BodyType @map("body_type")
-  imageUrl  String   @map("image_url")
+  imageUrl  String   @map("image_url") // 화면 표시용 — 누끼(투명 배경)
+  fittingImageUrl String? @map("fitting_image_url") // Gemini 코디 생성용 — 배경 포함본 (없으면 image_url로 폴백)
 
   userCharacters UserCharacter[]
 

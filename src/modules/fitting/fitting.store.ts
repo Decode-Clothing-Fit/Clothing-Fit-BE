@@ -60,6 +60,11 @@ export interface IFittingStore {
     incrementUserCount(userId: string): void;
     decrementUserCount(userId: string): void;
 
+    // 전체 진행 중 2D 코디 생성 수 (전역 동시성 상한 — 비용·메모리 폭증 방지)
+    getActiveCoordiCount(): number;
+    incrementActiveCoordiCount(): void;
+    decrementActiveCoordiCount(): void;
+
     // 사용자별 진행 중 2D 코디 생성 수 (동시성 제한)
     getCoordiCount(userId: string): number;
     incrementCoordiCount(userId: string): void;
@@ -76,6 +81,7 @@ class InMemoryFittingStore implements IFittingStore {
     private queue: string[] = [];
     private activeCount = 0;
     private userCounts = new Map<string, number>();
+    private activeCoordiCount = 0;
     private coordiCounts = new Map<string, number>();
     private idempotency = new Map<string, CoordiIdempotencyRecord>();
 
@@ -100,6 +106,10 @@ class InMemoryFittingStore implements IFittingStore {
         if (count <= 1) this.userCounts.delete(userId);
         else this.userCounts.set(userId, count - 1);
     }
+
+    getActiveCoordiCount() { return this.activeCoordiCount; }
+    incrementActiveCoordiCount() { this.activeCoordiCount++; }
+    decrementActiveCoordiCount() { if (this.activeCoordiCount > 0) this.activeCoordiCount--; }
 
     getCoordiCount(userId: string) { return this.coordiCounts.get(userId) ?? 0; }
     incrementCoordiCount(userId: string) {

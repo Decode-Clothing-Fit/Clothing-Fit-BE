@@ -30,11 +30,13 @@ const SYSTEM_GARMENT_RULE =
     'Garment rule: Reproduce each garment EXACTLY as in its source image — identical color, pattern, texture, print/logo, silhouette, and proportions. ' +
     'Do not redesign, recolor, simplify, or add/remove any details of the garments. Only adapt their fit onto the subject\'s body.';
 
-// 소스가 "프리셋 캐릭터(얼굴 없는 아바타)"일 때의 정체성 규칙. → 전신 스튜디오 이미지를 생성.
+// 소스가 "프리셋 캐릭터(얼굴 없는 아바타)"일 때의 정체성 규칙. → 전신 스튜디오 이미지를 생성하되, 인물은 배경 가로 정중앙에 배치.
 const SYSTEM_IDENTITY_CHARACTER =
-    'Task: dress the stylized avatar in image 1 with the provided garments and generate a single styled full-body outfit image. ' +
-    'The subject in image 1 is a stylized avatar. ' +
+    'Task: dress the stylized avatar in image 1 with the provided garments and generate a single styled full-body outfit image, with the avatar standing HORIZONTALLY CENTERED on the studio background from image 3. ' +
+    'The subject in image 1 is a stylized avatar that is ALREADY wearing a black base layer (leggings/tights and a tight top). ' +
+    'First take OFF ALL of that original clothing — none of it may remain, peek out, or be layered under the new garments — then dress it ONLY in the provided garments. ' +
     'Reproduce it exactly — same face, figure, proportions, material, color, art style, AND the exact same pose, body orientation, limb positions, and camera angle/framing. Never re-pose, rotate, or re-frame it. ' +
+    'Always place the avatar centered left-to-right on the background — never shifted toward the left or right edge. ' +
     'It has a smooth, featureless face: do not add eyes, nose, mouth, eyebrows, or hair, do not give it realistic human skin, and do not turn it into a real person. ' +
     'It looks mannequin-like, but do NOT render it as a generic store mannequin either — match image 1 as closely as possible. ' +
     'If the avatar is non-human or stylized, preserve its original form and art style and never convert it into a realistic human. ' +
@@ -98,7 +100,7 @@ export function buildCoordiPrompt(params: {
     // [Request] 정체성 항목·CRITICAL 문구를 소스별로 분기
     const requestIdentity = isUploadedImage
         ? 'Keep the person 100% identical to image 1 — same face, identity, hair, skin tone, body shape, pose, body orientation, and camera angle. Do not stylize, beautify, or alter the person; keep them photorealistic. Only the garments may change.'
-        : 'Keep the avatar 100% identical to image 1 — same featureless face, figure, art style, pose, body orientation, and camera angle. Do not add eyes, nose, mouth, or hair, and do not make it a realistic human. Do not re-pose or rotate the avatar. Only the garments may change.';
+        : 'Keep the avatar 100% identical to image 1 — same featureless face, figure, art style, pose, body orientation, and camera angle, and keep it horizontally centered on the image 3 background. Do not add eyes, nose, mouth, or hair, and do not make it a realistic human. Do not re-pose or rotate the avatar. Only the garments may change.';
 
     const criticalIdentity = isUploadedImage
         ? 'CRITICAL (person identity & pose): Reproduce the person EXACTLY as in image 1 — same face and facial features, identity, hair, skin tone, body shape, ' +
@@ -134,15 +136,14 @@ export function buildCoordiPrompt(params: {
               requestIdentity,
           ]
         : [
-              'Generate a single full-body image of the avatar (image 1) wearing all the garments.',
+              'Take OFF ALL of the avatar\'s original clothing in image 1 (including the black base layer — the leggings/tights and tight top), then generate a single full-body image of the avatar wearing the garments from the image 2 contact sheet (matched by each cell\'s category label). None of the original clothing may remain.',
               requestIdentity,
-              'Remove the black base layer (leggings/tights and tight top) the avatar wears in image 1.',
               missingDefaults.length > 0
                   ? `The avatar must end up FULLY DRESSED — never show bare skin on the torso or legs. For the essential clothing not provided, dress it in these exact defaults: ${missingDefaultsText}.`
                   : 'The avatar must end up fully dressed — never show bare skin on the torso or legs.',
               'Naturally complete any other categories that are not provided (e.g. shoes, outer) in a simple, unobtrusive way.',
-              'Place the avatar in the EXACT background shown in image 3 — reproduce that background precisely (same color, gradient, vignette, floor, and lighting). Do NOT invent, alter, or replace the background.',
-              'Frame the entire body from head to toe; do not crop the head.',
+              'Place the avatar HORIZONTALLY CENTERED on the EXACT background shown in image 3 — reproduce that background precisely (same color, gradient, vignette, floor, and lighting). Center the avatar left-to-right (do NOT shift it toward the left or right edge), and do NOT invent, alter, or replace the background.',
+              'Frame the entire body from head to toe; do not crop the head or feet.',
           ];
 
     const outputLines = isUploadedImage
@@ -151,7 +152,7 @@ export function buildCoordiPrompt(params: {
               '- The person must remain fully recognizable as the exact same individual in image 1.',
           ]
         : [
-              '- Generate and output a single full-body image of the styled outfit. (Image only.)',
+              '- Generate and output a single full-body image of the styled outfit, with the avatar horizontally centered on the image 3 background. (Image only.)',
               '- The full body must be visible from head to toe without any cropping.',
           ];
 
@@ -182,19 +183,19 @@ export function buildCoordiPrompt(params: {
         '[Output — VERY IMPORTANT]',
         ...outputLines,
         '',
-        // 업로드 사진은 "원래 옷 제거 + 시트 옷 착용"을 별도 CRITICAL로 한 번 더 못 박는다 (원본 옷이 남는 문제 방지)
-        ...(isUploadedImage
-            ? [
-                  'CRITICAL (outfit replacement): The person in image 1 is already dressed. You MUST remove ALL of that original outfit and replace it with the garments from the image 2 contact sheet (plus a simple default for any missing essential top/bottom). ' +
-                      'The result must show the person wearing ONLY those garments — do NOT keep, layer, blend, or leave ANY part of their original clothing visible. Applying the new garments is the whole point of the edit.',
-              ]
-            : []),
+        // 캐릭터·업로드 모두 "원래 옷 제거 + 시트 옷 착용"을 별도 CRITICAL로 한 번 더 못 박는다 (원본 옷이 남는 문제 방지)
+        isUploadedImage
+            ? 'CRITICAL (outfit replacement): The person in image 1 is already dressed. You MUST remove ALL of that original outfit and replace it with the garments from the image 2 contact sheet (plus a simple default for any missing essential top/bottom). ' +
+                  'The result must show the person wearing ONLY those garments — do NOT keep, layer, blend, or leave ANY part of their original clothing visible. Applying the new garments is the whole point of the edit.'
+            : 'CRITICAL (outfit replacement): The avatar in image 1 is already wearing a black base layer (leggings/tights and a tight top). You MUST remove ALL of that original clothing and replace it with the garments from the image 2 contact sheet (plus a simple default for any missing essential top/bottom). ' +
+                  'The result must show the avatar wearing ONLY those garments — do NOT keep, layer, blend, or leave ANY part of the original black base layer visible (not peeking out at the neckline, sleeves, hem, or ankles). Applying the new garments is the whole point of the edit.',
         criticalIdentity,
-        // 프리셋 아바타는 고정 배경(Image 3) 재현을 한 번 더 못 박아 배경 일관성을 강제한다.
+        // 프리셋 아바타는 고정 배경(Image 3) 재현 + 가로 정중앙 배치를 한 번 더 못 박아 배경 일관성·좌우 쏠림을 막는다.
         ...(isUploadedImage
             ? []
             : [
-                  'CRITICAL (background): Use the background from image 3 EXACTLY as shown — same color, gradient, vignette, floor, and lighting. ' +
+                  'CRITICAL (placement & background): Place the avatar HORIZONTALLY CENTERED on the image 3 background — centered left-to-right, never shifted toward the left or right edge, with equal empty space on both sides. ' +
+                      'Use the background from image 3 EXACTLY as shown — same color, gradient, vignette, floor, and lighting. ' +
                       'Do NOT generate a different background, change its tone, or add any props/objects/shadows of your own. Only the avatar and its garments are foreground; everything behind must match image 3.',
               ]),
         'CRITICAL (garment fidelity): Each garment must look identical to its cell in the image 2 contact sheet — same color, pattern, print/logo, and shape. ' +

@@ -2,6 +2,8 @@
 
 > 사용자의 실제 체형 기반 2D·3D 가상 피팅을 통해 온라인 의류의 핏과 스타일을 직관적으로 확인할 수 있는 플랫폼
 
+[![Deploy to Dev](https://github.com/prgrms-fullcycle-devcourse/webfull_9_10_ClothingFit_BE/actions/workflows/deploy-dev.yml/badge.svg)](https://github.com/prgrms-fullcycle-devcourse/webfull_9_10_ClothingFit_BE/actions/workflows/deploy-dev.yml)
+
 ---
 
 ## 🛠 Backend 기술 스택 (Tech Stack)
@@ -20,6 +22,7 @@
 | API Docs        | ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat-square&logo=swagger&logoColor=black) |
 | Environment     | ![dotenv](https://img.shields.io/badge/dotenv-ECD53F?style=flat-square&logo=dotenv&logoColor=black) |
 | Code Quality    | ![Biome](https://img.shields.io/badge/Biome-60A5FA?style=flat-square&logo=biome&logoColor=white) |
+| CI/CD           | ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white) |
 | Deployment      | ![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?style=flat-square&logo=amazons3&logoColor=white) ![AWS EC2](https://img.shields.io/badge/AWS_EC2-FF9900?style=flat-square&logo=amazonec2&logoColor=white) ![AWS RDS](https://img.shields.io/badge/AWS_RDS-527FFF?style=flat-square&logo=amazonrds&logoColor=white) |
 
 ## 📂 Backend 폴더 구조 (Folder Structure)
@@ -134,6 +137,29 @@ pnpm build      # 프로덕션 빌드
 
 pnpm start      # 프로덕션 실행
 ```
+
+### 5. API 문서 확인
+
+서버 실행 후 아래 주소에서 Swagger UI로 전체 API 명세를 확인할 수 있습니다.
+
+```text
+http://localhost:3000/api-docs
+```
+
+| 리소스 | 설명 | 담당 |
+| ------------------------ | ------------------------------- | ------ |
+| `/api/v1/auth`           | 로그인 / 회원가입 / OAuth (Google, Kakao) | [@doeun9903](https://github.com/doeun9903) |
+| `/api/v1/users`          | 사용자 정보 관리 | [@doeun9903](https://github.com/doeun9903) |
+| `/api/v1/profile`        | 프로필 관리 | [@doeun9903](https://github.com/doeun9903) |
+| `/api/v1/closet`         | 옷장(보유 의류) 관리 | [@hollyjelly](https://github.com/hollyjelly) |
+| `/api/v1/fitting`        | 2D·3D 가상 피팅 | [@hollyjelly](https://github.com/hollyjelly) |
+| `/api/v1/characters`     | 아바타 캐릭터 | [@hollyjelly](https://github.com/hollyjelly) |
+| `/api/v1/avatar`         | 아바타 생성 | [@hollyjelly](https://github.com/hollyjelly) |
+| `/api/v1/posts`          | 게시글 | [@s576air](https://github.com/s576air) |
+| `/api/v1/follows`        | 팔로우 | [@s576air](https://github.com/s576air) |
+| `/api/v1/notifications`  | 알림 | [@s576air](https://github.com/s576air) |
+| `/api/v1/home`           | 홈 피드 | [@s576air](https://github.com/s576air) |
+| `/api/v1/health`         | 헬스 체크 | [@s576air](https://github.com/s576air) |
 
 ---
 
